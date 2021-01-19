@@ -1,0 +1,11 @@
+services:
+    mongodb:
+        image: mongo:4
+        ports: [27017:27017]
+    adminmongo:
+        depends_on: [mongodb]
+        image: mrvautin/adminmongo
+        ports: [1234:1234]
+        environment:
+            - HOST=0.0.0.0
+            - PORT=1234

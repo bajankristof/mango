@@ -1,0 +1,4 @@
+[{<<"bson">>,
+  {git,"git://github.com/bambyte/bson.git",
+       {ref,"1555ab19280157ad91a3f8a845d3907bdc73ddf5"}},
+  0}].
