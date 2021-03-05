@@ -12,7 +12,6 @@
     intensity => 10,
     period => 60
 }).
--define(SPECS, []).
 
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
@@ -22,4 +21,4 @@ init([]) ->
         ({Id, Opts}) -> mango_connection:child_spec(Id, Opts);
         ({Id, Via, Opts}) -> mango_connection:child_spec(Id, Via, Opts)
     end, application:get_env(mango, connections, [])),
-    {ok, {?FLAGS, ?SPECS ++ Connections}}.
+    {ok, {?FLAGS, Connections}}.

@@ -1,4 +1,4 @@
 [{<<"bson">>,
-  {git,"git://github.com/bambyte/bson.git",
-       {ref,"1555ab19280157ad91a3f8a845d3907bdc73ddf5"}},
+  {git,"git://github.com/bajankristof/bson.git",
+       {ref,"821037917ae78c5e4a720ef49386bdff7acf7db9"}},
   0}].
