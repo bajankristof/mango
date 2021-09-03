@@ -17,8 +17,7 @@ start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 init([]) ->
-    Connections = lists:map(fun
-        ({Id, Opts}) -> mango_connection:child_spec(Id, Opts);
-        ({Id, Via, Opts}) -> mango_connection:child_spec(Id, Via, Opts)
+    Connections = lists:map(fun ({Id, Opts}) ->
+        mango_connection:child_spec(Id, Opts)
     end, application:get_env(mango, connections, [])),
     {ok, {?FLAGS, Connections}}.

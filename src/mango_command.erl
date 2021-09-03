@@ -49,6 +49,8 @@
 %% run(Connection, admin, Command)
 -export([run/3]).
 
+-include_lib("bson/include/bson.hrl").
+
 -type t() :: proplists:proplist().
 -export_type([t/0]).
 
@@ -134,7 +136,7 @@ get_more(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}
     Opts :: proplists:proplist()
 ) -> mango_op_msg:response().
 get_more(Connection, Database, Collection, Id, Opts) ->
-    run(Connection, Database, [{"getMore", {long, Id}}, {"collection", Collection} | Opts]).
+    run(Connection, Database, [{"getMore", #'bson.long'{value = Id}}, {"collection", Collection} | Opts]).
 
 -spec insert(
     Connection :: mango:connection(),
@@ -242,7 +244,7 @@ kill_cursor(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Curs
     Opts :: proplists:proplist()
 ) -> mango_op_msg:response().
 kill_cursors(Connection, Database, Collection, Ids, Opts) ->
-    Cursors = lists:map(fun (Id) -> {long, Id} end, Ids),
+    Cursors = lists:map(fun (Id) -> #'bson.long'{value = Id} end, Ids),
     run(Connection, Database, [{"killCursors", Collection}, {"cursors", Cursors} | Opts]).
 
 -spec list_collections(

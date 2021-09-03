@@ -1,9 +1,9 @@
 {application, mango,
- [{description, "An OTP application"},
+ [{description, "MongoDB micro-driver for Erlang"},
   {vsn, "0.1.0"},
   {registered, []},
   {mod, {mango_app, []}},
-  {applications, [kernel, stdlib, bson]},
+  {applications, [kernel, stdlib, bson, poolboy]},
   {env,[]},
   {modules, []},
 

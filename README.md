@@ -1,7 +1,7 @@
 mango
 =====
 
-An OTP application
+MongoDB micro-driver for Erlang
 
 Build
 -----

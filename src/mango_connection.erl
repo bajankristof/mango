@@ -8,9 +8,7 @@
 ]).
 -export([
     start_link/1,
-    start_link/2,
-    child_spec/2,
-    child_spec/3
+    child_spec/2
 ]).
 -export([
     init/1,
@@ -22,13 +20,16 @@
 ]).
 
 -record(state, {host, port, socket, queue = #{}, buffer = <<>>}).
+-record(init_arg, {opts}).
 
 -spec request(
     Connection :: mango:connection(),
     Request :: mango_message:t()
 ) -> {ok, mango_message:t()} | {error, term()}.
 request(Connection, Request) ->
-    gen_server:call(Connection, Request).
+    poolboy:transaction(Connection, fun (Worker) ->
+        gen_server:call(Worker, Request)
+    end).
 
 -spec request(
     Connection :: mango:connection(),
@@ -36,23 +37,24 @@ request(Connection, Request) ->
     Timeout :: integer()
 ) -> {ok, mango_message:t()} | {error, term()}.
 request(Connection, Request, Timeout) ->
-    gen_server:call(Connection, Request, Timeout).
+    poolboy:transaction(Connection, fun (Worker) ->
+        gen_server:call(Worker, Request, Timeout)
+    end, Timeout).
 
+start_link({worker, #init_arg{opts = Opts}}) ->
+    gen_server:start_link(?MODULE, Opts, []);
 start_link(Opts) when erlang:is_list(Opts) ->
     start_link(maps:from_list(Opts));
 start_link(Opts) when erlang:is_map(Opts) ->
-    gen_server:start_link(?MODULE, Opts, []).
-
-start_link(Via, Opts) when erlang:is_list(Opts) ->
-    start_link(Via, maps:from_list(Opts));
-start_link(Via, Opts) when erlang:is_map(Opts) ->
-    gen_server:start_link(Via, ?MODULE, Opts, []).
+    poolboy:start_link([
+        {worker_module, ?MODULE},
+        {size, maps:get(pool_size, Opts, 10)},
+        {max_overflow, 0}
+        | maps:to_list(maps:with([name], Opts))
+    ], {worker, #init_arg{opts = Opts}}).
 
 child_spec(Id, Opts) ->
     #{id => Id, start => {?MODULE, start_link, [Opts]}}.
-
-child_spec(Id, Via, Opts) ->
-    #{id => Id, start => {?MODULE, start_link, [Via, Opts]}}.
 
 init(Opts) ->
     {ok, #state{
