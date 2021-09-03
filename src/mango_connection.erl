@@ -8,7 +8,8 @@
 ]).
 -export([
     start_link/1,
-    child_spec/2
+    child_spec/2,
+    stop/1
 ]).
 -export([
     init/1,
@@ -41,6 +42,8 @@ request(Connection, Request, Timeout) ->
         gen_server:call(Worker, Request, Timeout)
     end, Timeout).
 
+-spec start_link(Opts :: {worker, {init_arg, map()}} | list() | map()) ->
+    {ok, pid()} | {error, term()}.
 start_link({worker, #init_arg{opts = Opts}}) ->
     gen_server:start_link(?MODULE, Opts, []);
 start_link(Opts) when erlang:is_list(Opts) ->
@@ -53,10 +56,16 @@ start_link(Opts) when erlang:is_map(Opts) ->
         | maps:to_list(maps:with([name], Opts))
     ], {worker, #init_arg{opts = Opts}}).
 
+-spec child_spec(Id :: term(), Opts :: list() | map()) -> map().
 child_spec(Id, Opts) ->
     #{id => Id, start => {?MODULE, start_link, [Opts]}}.
 
+-spec stop(Connection :: mango:connection()) -> ok.
+stop(Connection) ->
+    poolboy:stop(Connection).
+
 init(Opts) ->
+    erlang:process_flag(trap_exit, true),
     {ok, #state{
         host = maps:get(host, Opts, "127.0.0.1"),
         port = maps:get(port, Opts, 27017)
