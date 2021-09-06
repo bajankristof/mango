@@ -155,13 +155,18 @@ find_and_remove(Connection, Collection, Selector) ->
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list() | map()
-) -> {ok, bson:document()} | {error, term()}.
+) -> bson:document() | undefined | {error, term()}.
 find_and_remove(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
     find_and_remove(Connection, Collection, Selector, maps:to_list(Opts));
 find_and_remove(Connection, Collection, Selector, Opts) ->
     Database = mango_connection:database(Connection),
-    mango_command:find_and_modify(Connection, Database, Collection,
-        [{"query", Selector}, {"remove", true} | Opts]).
+    case mango_command:find_and_modify(Connection, Database, Collection,
+        [{"query", Selector}, {"remove", true} | Opts]) of
+            {ok, #{<<"value">> := null}} -> undefined;
+            {ok, #{<<"value">> := Document}} -> Document;
+            {ok, #{}} -> undefined;
+            {error, Reason} -> {error, Reason}
+    end.
 
 %% @equiv find_and_update(Connection, Collection, Selector, Update, [])
 find_and_update(Connection, Collection, Selector, Update) ->
@@ -173,15 +178,16 @@ find_and_update(Connection, Collection, Selector, Update) ->
     Selector :: bson:document(),
     Update :: bson:document(),
     Opts :: list() | map()
-) -> {ok, bson:document()} | {error, term()}.
+) -> bson:document() | undefined | {error, term()}.
 find_and_update(Connection, Collection, Selector, Update, Opts) when erlang:is_map(Opts) ->
     find_and_update(Connection, Collection, Selector, Update, maps:to_list(Opts));
 find_and_update(Connection, Collection, Selector, Update, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:find_and_modify(Connection, Database, Collection,
         [{"query", Selector}, {"update", Update} | Opts]) of
-            {ok, #{<<"value">> := Document}} -> {ok, Document};
-            {ok, #{}} -> {ok, undefined};
+            {ok, #{<<"value">> := null}} -> undefined;
+            {ok, #{<<"value">> := Document}} -> Document;
+            {ok, #{}} -> undefined;
             {error, Reason} -> {error, Reason}
     end.
 
@@ -198,7 +204,7 @@ find_one(Connection, Collection, Selector) ->
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list() | map()
-) -> {ok, bson:document()} | {error, term()}.
+) -> bson:document() | undefined | {error, term()}.
 find_one(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
     find_one(Connection, Collection, Selector, maps:to_list(Opts));
 find_one(Connection, Collection, Selector, Opts) ->
