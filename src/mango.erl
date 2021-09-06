@@ -2,13 +2,14 @@
 
 -export([aggregate/3, aggregate/4]).
 -export([count/2, count/3, count/4]).
+-export([delete/3, delete/4]).
 -export([distinct/3, distinct/4, distinct/5]).
 -export([find/2, find/3, find/4]).
 -export([find_and_remove/3, find_and_remove/4]).
 -export([find_and_update/4, find_and_update/5]).
 -export([find_one/2, find_one/3, find_one/4]).
 -export([insert/3, insert/4]).
--export([update/3, update/4]).
+-export([update/4, update/6, update/7]).
 -export([run_command/2]).
 
 -type connection() :: pid() | atom() | {via, atom(), term()}.
@@ -66,6 +67,26 @@ count(Connection, Collection, Selector, Opts) ->
             {ok, #{<<"n">> := Count}} -> {ok, Count};
             {error, Reason} -> {error, Reason}
     end.
+
+%% @equiv delete(Connection, Collection, Selector, 0)
+delete(Connection, Collection, Selector) ->
+    delete(Connection, Collection, Selector, 0).
+
+%% @equiv delete(Connection, Collection, Selector, Limit, [])
+delete(Connection, Collection, Selector, Limit) ->
+    delete(Connection, Collection, Selector, Limit, []).
+
+-spec delete(
+    Connection :: mango:connection(),
+    Collection :: mango:collection(),
+    Selector :: bson:document(),
+    Limit :: integer(),
+    Opts :: list()
+) -> {ok, bson:document()} | {error, term()}.
+delete(Connection, Collection, Selector, Limit, Opts) ->
+    Database = mango_connection:database(Connection),
+    Statement = maps:from_list([{"q", Selector}, {"limit", Limit} | Opts]),
+    mango_command:delete(Connection, Database, Collection, [Statement], []).
 
 %% @equiv distinct(Connection, Collection, Key, #{})
 distinct(Connection, Collection, Key) ->
@@ -183,31 +204,34 @@ insert(Connection, Collection, Statement) ->
     Collection :: collection(),
     What :: bson:document() | [bson:document()],
     Opts :: list()
-) -> ok | {error, term()}.
+) -> {ok, bson:document()} | {error, term()}.
 insert(Connection, Collection, #{} = Statement, Opts) ->
     insert(Connection, Collection, [Statement], Opts);
 insert(Connection, Collection, Statement, Opts) ->
     Database = mango_connection:database(Connection),
-    case mango_command:insert(Connection, Database, Collection, Statement, Opts) of
-        {ok, #{<<"n">> := Count}} -> {ok, Count};
-        {error, Reason} -> {error, Reason}
-    end.
+    mango_command:insert(Connection, Database, Collection, Statement, Opts).
 
-%% @equiv update(Connection, Collection, Statement, [])
-update(Connection, Collection, Statement) ->
-    update(Connection, Collection, Statement, []).
+%% @equiv update(Connection, Collection, Selector, Update, false, false)
+update(Connection, Collection, Selector, Update) ->
+    update(Connection, Collection, Selector, Update, false, false).
+
+%% @equiv update(Connection, Collection, Selector, Update, Upsert, Multi, [])
+update(Connection, Collection, Selector, Update, Upsert, Multi) ->
+    update(Connection, Collection, Selector, Update, Upsert, Multi, []).
 
 -spec update(
     Connection :: connection(),
     Collection :: collection(),
-    Statement :: bson:document() | [bson:document()],
+    Selector :: bson:document(),
+    Update :: bson:document(),
+    Upsert :: boolean(),
+    Multi :: boolean(),
     Opts :: list()
-) -> term().
-update(Connection, Collection, #{} = Statement, Opts) ->
-    update(Connection, Collection, [Statement], Opts);
-update(Connection, Collection, Statement, Opts) ->
+) -> {ok, bson:document()} | {error, term()}.
+update(Connection, Collection, Selector, Update, Upsert, Multi, Opts) ->
     Database = mango_connection:database(Connection),
-    mango_command:update(Connection, Database, Collection, Statement, Opts).
+    Statement = maps:from_list([{"q", Selector}, {"u", Update}, {"upsert", Upsert}, {"multi", Multi} | Opts]),
+    mango_command:update(Connection, Database, Collection, [Statement], []).
 
 -spec run_command(
     Connection :: connection(),
