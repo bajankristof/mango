@@ -3,6 +3,7 @@
 -behaviour(gen_server).
 
 -export([
+    database/1,
     request/2,
     request/3
 ]).
@@ -20,8 +21,14 @@
     terminate/2
 ]).
 
--record(state, {host, port, socket, queue = #{}, buffer = <<>>}).
+-record(state, {host, port, database, socket, queue = #{}, buffer = <<>>}).
 -record(init_arg, {opts}).
+
+-spec database(Connection :: mango:connection()) -> term().
+database(Connection) ->
+    poolboy:transaction(Connection, fun (Worker) ->
+        gen_server:call(Worker, database)
+    end).
 
 -spec request(
     Connection :: mango:connection(),
@@ -48,7 +55,9 @@ start_link({worker, #init_arg{opts = Opts}}) ->
     gen_server:start_link(?MODULE, Opts, []);
 start_link(Opts) when erlang:is_list(Opts) ->
     start_link(maps:from_list(Opts));
-start_link(Opts) when erlang:is_map(Opts) ->
+start_link(#{database := Database} = Opts)
+        when erlang:is_atom(Database)
+        orelse erlang:is_binary(Database) ->
     poolboy:start_link([
         {worker_module, ?MODULE},
         {size, maps:get(pool_size, Opts, 10)},
@@ -68,9 +77,12 @@ init(Opts) ->
     erlang:process_flag(trap_exit, true),
     {ok, #state{
         host = maps:get(host, Opts, "127.0.0.1"),
-        port = maps:get(port, Opts, 27017)
+        port = maps:get(port, Opts, 27017),
+        database = maps:get(database, Opts)
     }, {continue, connect}}.
 
+handle_call(database, _, #state{database = Database} = State) ->
+    {reply, Database, State};
 handle_call(_, _, #state{socket = undefined} = State) ->
     {reply, {error, <<"ENOSOCK">>}, State};
 handle_call(<<_:16/binary, _/binary>> = Request, Client, #state{socket = Socket, queue = Queue} = State) ->

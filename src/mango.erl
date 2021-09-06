@@ -1,15 +1,15 @@
 -module(mango).
 
--export([aggregate/4, aggregate/5]).
--export([count/3, count/4, count/5]).
--export([distinct/4, distinct/5, distinct/6]).
--export([find/3, find/4, find/5]).
--export([find_and_remove/4, find_and_remove/5]).
--export([find_and_update/5, find_and_update/6]).
--export([find_one/3, find_one/4, find_one/5]).
--export([insert/4, insert/5]).
--export([update/4, update/5]).
--export([run_command/3]).
+-export([aggregate/3, aggregate/4]).
+-export([count/2, count/3, count/4]).
+-export([distinct/3, distinct/4, distinct/5]).
+-export([find/2, find/3, find/4]).
+-export([find_and_remove/3, find_and_remove/4]).
+-export([find_and_update/4, find_and_update/5]).
+-export([find_one/2, find_one/3, find_one/4]).
+-export([insert/3, insert/4]).
+-export([update/3, update/4]).
+-export([run_command/2]).
 
 -type connection() :: pid() | atom() | {via, atom(), term()}.
 -type database() :: atom() | binary().
@@ -26,18 +26,18 @@
 
 %% === Aggregation Functions ===
 
-%% @equiv aggregate(Connection, Database, Collection, Pipeline)
-aggregate(Connection, Database, Collection, Pipeline) ->
-    aggregate(Connection, Database, Collection, Pipeline, []).
+%% @equiv aggregate(Connection, Collection, Pipeline, [])
+aggregate(Connection, Collection, Pipeline) ->
+    aggregate(Connection, Collection, Pipeline, []).
 
 -spec aggregate(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Pipeline :: bson:array(),
     Opts :: list()
 ) -> {ok, cursor()} | {error, term()}.
-aggregate(Connection, Database, Collection, Pipeline, Opts) ->
+aggregate(Connection, Collection, Pipeline, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:aggregate(Connection, Database, Collection, Pipeline,
         [{"cursor", #{"batchSize" => 0}} | Opts]) of
             {ok, #{<<"cursor">> := Spec}} ->
@@ -45,45 +45,45 @@ aggregate(Connection, Database, Collection, Pipeline, Opts) ->
             {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv count(Connection, Database, Collection, #{})
-count(Connection, Database, Collection) ->
-    count(Connection, Database, Collection, #{}).
+%% @equiv count(Connection, Collection, #{})
+count(Connection, Collection) ->
+    count(Connection, Collection, #{}).
 
-%% @equiv count(Connection, Database, Collection, Selector, [])
-count(Connection, Database, Collection, Selector) ->
-    count(Connection, Database, Collection, Selector, []).
+%% @equiv count(Connection, Collection, Selector, [])
+count(Connection, Collection, Selector) ->
+    count(Connection, Collection, Selector, []).
 
 -spec count(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list()
 ) -> {ok, integer()} | {error, term()}.
-count(Connection, Database, Collection, Selector, Opts) ->
+count(Connection, Collection, Selector, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:count(Connection, Database, Collection,
         [{"query", Selector} | Opts]) of
             {ok, #{<<"n">> := Count}} -> {ok, Count};
             {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv distinct(Connection, Database, Collection, Key, #{})
-distinct(Connection, Database, Collection, Key) ->
-    distinct(Connection, Database, Collection, Key, #{}).
+%% @equiv distinct(Connection, Collection, Key, #{})
+distinct(Connection, Collection, Key) ->
+    distinct(Connection, Collection, Key, #{}).
 
-%% @equiv distinct(Connection, Database, Collection, Key, Selector, [])
-distinct(Connection, Database, Collection, Key, Selector) ->
-    distinct(Connection, Database, Collection, Key, Selector, []).
+%% @equiv distinct(Connection, Collection, Key, Selector, [])
+distinct(Connection, Collection, Key, Selector) ->
+    distinct(Connection, Collection, Key, Selector, []).
 
 -spec distinct(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Key :: atom() | binary() | list(),
     Selector :: bson:document(),
     Opts :: list()
 ) -> {ok, list()} | {error, term()}.
-distinct(Connection, Database, Collection, Key, Selector, Opts) ->
+distinct(Connection, Collection, Key, Selector, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:distinct(Connection, Database, Collection, Key,
         [{"query", Selector} | Opts]) of
             {ok, #{<<"values">> := Values}} -> {ok, Values};
@@ -92,22 +92,22 @@ distinct(Connection, Database, Collection, Key, Selector, Opts) ->
 
 %% === Query and Write Operation Functions ===
 
-%% @equiv find(Connection, Database, Collection, #{})
-find(Connection, Database, Collection) ->
-    find(Connection, Database, Collection, #{}).
+%% @equiv find(Connection, Collection, #{})
+find(Connection, Collection) ->
+    find(Connection, Collection, #{}).
 
-%% @equiv find(Connection, Database, Collection, Selector, [])
-find(Connection, Database, Collection, Selector) ->
-    find(Connection, Database, Collection, Selector, []).
+%% @equiv find(Connection, Collection, Selector, [])
+find(Connection, Collection, Selector) ->
+    find(Connection, Collection, Selector, []).
 
 -spec find(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list()
 ) -> {ok, cursor()} | {error, term()}.
-find(Connection, Database, Collection, Selector, Opts) ->
+find(Connection, Collection, Selector, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:find(Connection, Database, Collection,
         [{"filter", Selector}, {"batchSize", 0}, {"singleBatch", false} | Opts]) of
             {ok, #{<<"cursor">> := Spec}} ->
@@ -115,34 +115,34 @@ find(Connection, Database, Collection, Selector, Opts) ->
             {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv find_and_remove(Connection, Database, Collection, Selector, [])
-find_and_remove(Connection, Database, Collection, Selector) ->
-    find_and_remove(Connection, Database, Collection, Selector, []).
+%% @equiv find_and_remove(Connection, Collection, Selector, [])
+find_and_remove(Connection, Collection, Selector) ->
+    find_and_remove(Connection, Collection, Selector, []).
 
 -spec find_and_remove(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list()
 ) -> {ok, bson:document()} | {error, term()}.
-find_and_remove(Connection, Database, Collection, Selector, Opts) ->
+find_and_remove(Connection, Collection, Selector, Opts) ->
+    Database = mango_connection:database(Connection),
     mango_command:find_and_modify(Connection, Database, Collection,
         [{"query", Selector}, {"remove", true} | Opts]).
 
-%% @equiv find_and_update(Connection, Database, Collection, Selector, Statement, [])
-find_and_update(Connection, Database, Collection, Selector, Statement) ->
-    find_and_update(Connection, Database, Collection, Selector, Statement, []).
+%% @equiv find_and_update(Connection, Collection, Selector, Statement, [])
+find_and_update(Connection, Collection, Selector, Statement) ->
+    find_and_update(Connection, Collection, Selector, Statement, []).
 
 -spec find_and_update(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Selector :: bson:document(),
     Statement :: bson:document(),
     Opts :: list()
 ) -> {ok, bson:document()} | {error, term()}.
-find_and_update(Connection, Database, Collection, Selector, Statement, Opts) ->
+find_and_update(Connection, Collection, Selector, Statement, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:find_and_modify(Connection, Database, Collection,
         [{"query", Selector}, {"update", Statement} | Opts]) of
             {ok, #{<<"value">> := null} = Document} ->
@@ -151,22 +151,22 @@ find_and_update(Connection, Database, Collection, Selector, Statement, Opts) ->
             {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv find_one(Connection, Database, Collection, #{})
-find_one(Connection, Database, Collection) ->
-    find_one(Connection, Database, Collection, #{}).
+%% @equiv find_one(Connection, Collection, #{})
+find_one(Connection, Collection) ->
+    find_one(Connection, Collection, #{}).
 
-%% @equiv find_one(Connection, Database, Collection, Selector, [])
-find_one(Connection, Database, Collection, Selector) ->
-    find_one(Connection, Database, Collection, Selector, []).
+%% @equiv find_one(Connection, Collection, Selector, [])
+find_one(Connection, Collection, Selector) ->
+    find_one(Connection, Collection, Selector, []).
 
 -spec find_one(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Selector :: bson:document(),
     Opts :: list()
 ) -> {ok, bson:document()} | {error, term()}.
-find_one(Connection, Database, Collection, Selector, Opts) ->
+find_one(Connection, Collection, Selector, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:find(Connection, Database, Collection,
         [{"filter", Selector}, {"batchSize", 1}, {"singleBatch", true} | Opts]) of
             {ok, #{<<"cursor">> := #{<<"firstBatch">> := [Document]}}} -> Document;
@@ -174,45 +174,45 @@ find_one(Connection, Database, Collection, Selector, Opts) ->
             {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv insert(Connection, Database, Collection, Statement, [])
-insert(Connection, Database, Collection, Statement) ->
-    insert(Connection, Database, Collection, Statement, []).
+%% @equiv insert(Connection, Collection, Statement, [])
+insert(Connection, Collection, Statement) ->
+    insert(Connection, Collection, Statement, []).
 
 -spec insert(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     What :: bson:document() | [bson:document()],
     Opts :: list()
 ) -> ok | {error, term()}.
-insert(Connection, Database, Collection, #{} = Statement, Opts) ->
-    insert(Connection, Database, Collection, [Statement], Opts);
-insert(Connection, Database, Collection, Statement, Opts) ->
+insert(Connection, Collection, #{} = Statement, Opts) ->
+    insert(Connection, Collection, [Statement], Opts);
+insert(Connection, Collection, Statement, Opts) ->
+    Database = mango_connection:database(Connection),
     case mango_command:insert(Connection, Database, Collection, Statement, Opts) of
         {ok, #{<<"n">> := Count}} -> {ok, Count};
         {error, Reason} -> {error, Reason}
     end.
 
-%% @equiv update(Connection, Database, Collection, Statement, [])
-update(Connection, Database, Collection, Statement) ->
-    update(Connection, Database, Collection, Statement, []).
+%% @equiv update(Connection, Collection, Statement, [])
+update(Connection, Collection, Statement) ->
+    update(Connection, Collection, Statement, []).
 
 -spec update(
     Connection :: connection(),
-    Database :: database(),
     Collection :: collection(),
     Statement :: bson:document() | [bson:document()],
     Opts :: list()
 ) -> term().
-update(Connection, Database, Collection, #{} = Statement, Opts) ->
-    update(Connection, Database, Collection, [Statement], Opts);
-update(Connection, Database, Collection, Statement, Opts) ->
+update(Connection, Collection, #{} = Statement, Opts) ->
+    update(Connection, Collection, [Statement], Opts);
+update(Connection, Collection, Statement, Opts) ->
+    Database = mango_connection:database(Connection),
     mango_command:update(Connection, Database, Collection, Statement, Opts).
 
 -spec run_command(
     Connection :: connection(),
-    Database :: database(),
     Command :: mango_command:t()
 ) -> mango_op_msg:response().
-run_command(Connection, Database, Command) ->
+run_command(Connection, Command) ->
+    Database = mango_connection:database(Connection),
     mango_command:run(Connection, Database, Command).
