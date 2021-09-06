@@ -151,24 +151,23 @@ find_and_remove(Connection, Collection, Selector, Opts) ->
     mango_command:find_and_modify(Connection, Database, Collection,
         [{"query", Selector}, {"remove", true} | Opts]).
 
-%% @equiv find_and_update(Connection, Collection, Selector, Statement, [])
-find_and_update(Connection, Collection, Selector, Statement) ->
-    find_and_update(Connection, Collection, Selector, Statement, []).
+%% @equiv find_and_update(Connection, Collection, Selector, Update, [])
+find_and_update(Connection, Collection, Selector, Update) ->
+    find_and_update(Connection, Collection, Selector, Update, []).
 
 -spec find_and_update(
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Statement :: bson:document(),
+    Update :: bson:document(),
     Opts :: list()
 ) -> {ok, bson:document()} | {error, term()}.
-find_and_update(Connection, Collection, Selector, Statement, Opts) ->
+find_and_update(Connection, Collection, Selector, Update, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:find_and_modify(Connection, Database, Collection,
-        [{"query", Selector}, {"update", Statement} | Opts]) of
-            {ok, #{<<"value">> := null} = Document} ->
-                {ok, maps:without([<<"value">>], Document)};
-            {ok, #{<<"value">> := _} = Document} -> {ok, Document};
+        [{"query", Selector}, {"update", Update} | Opts]) of
+            {ok, #{<<"value">> := Document}} -> {ok, Document};
+            {ok, #{}} -> {ok, undefined};
             {error, Reason} -> {error, Reason}
     end.
 
