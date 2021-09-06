@@ -35,8 +35,10 @@ aggregate(Connection, Collection, Pipeline) ->
     Connection :: connection(),
     Collection :: collection(),
     Pipeline :: bson:array(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, cursor()} | {error, term()}.
+aggregate(Connection, Collection, Pipeline, Opts) when erlang:is_map(Opts) ->
+    aggregate(Connection, Collection, Pipeline, maps:to_list(Opts));
 aggregate(Connection, Collection, Pipeline, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:aggregate(Connection, Database, Collection, Pipeline,
@@ -58,8 +60,10 @@ count(Connection, Collection, Selector) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, integer()} | {error, term()}.
+count(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
+    count(Connection, Collection, Selector, maps:to_list(Opts));
 count(Connection, Collection, Selector, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:count(Connection, Database, Collection,
@@ -81,8 +85,10 @@ delete(Connection, Collection, Selector, Limit) ->
     Collection :: mango:collection(),
     Selector :: bson:document(),
     Limit :: integer(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+delete(Connection, Collection, Selector, Limit, Opts) when erlang:is_map(Opts) ->
+    delete(Connection, Collection, Selector, Limit, maps:to_list(Opts));
 delete(Connection, Collection, Selector, Limit, Opts) ->
     Database = mango_connection:database(Connection),
     Statement = maps:from_list([{"q", Selector}, {"limit", Limit} | Opts]),
@@ -101,8 +107,10 @@ distinct(Connection, Collection, Key, Selector) ->
     Collection :: collection(),
     Key :: atom() | binary() | list(),
     Selector :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, list()} | {error, term()}.
+distinct(Connection, Collection, Key, Selector, Opts) when erlang:is_map(Opts) ->
+    distinct(Connection, Collection, Key, Selector, maps:to_list(Opts));
 distinct(Connection, Collection, Key, Selector, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:distinct(Connection, Database, Collection, Key,
@@ -125,8 +133,10 @@ find(Connection, Collection, Selector) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, cursor()} | {error, term()}.
+find(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
+    find(Connection, Collection, Selector, maps:to_list(Opts));
 find(Connection, Collection, Selector, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:find(Connection, Database, Collection,
@@ -144,8 +154,10 @@ find_and_remove(Connection, Collection, Selector) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+find_and_remove(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
+    find_and_remove(Connection, Collection, Selector, maps:to_list(Opts));
 find_and_remove(Connection, Collection, Selector, Opts) ->
     Database = mango_connection:database(Connection),
     mango_command:find_and_modify(Connection, Database, Collection,
@@ -160,8 +172,10 @@ find_and_update(Connection, Collection, Selector, Update) ->
     Collection :: collection(),
     Selector :: bson:document(),
     Update :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+find_and_update(Connection, Collection, Selector, Update, Opts) when erlang:is_map(Opts) ->
+    find_and_update(Connection, Collection, Selector, Update, maps:to_list(Opts));
 find_and_update(Connection, Collection, Selector, Update, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:find_and_modify(Connection, Database, Collection,
@@ -183,8 +197,10 @@ find_one(Connection, Collection, Selector) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+find_one(Connection, Collection, Selector, Opts) when erlang:is_map(Opts) ->
+    find_one(Connection, Collection, Selector, maps:to_list(Opts));
 find_one(Connection, Collection, Selector, Opts) ->
     Database = mango_connection:database(Connection),
     case mango_command:find(Connection, Database, Collection,
@@ -202,8 +218,10 @@ insert(Connection, Collection, Statement) ->
     Connection :: connection(),
     Collection :: collection(),
     What :: bson:document() | [bson:document()],
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+insert(Connection, Collection, #{} = Statement, Opts) when erlang:is_map(Opts) ->
+    insert(Connection, Collection, #{} = Statement, maps:to_list(Opts));
 insert(Connection, Collection, #{} = Statement, Opts) ->
     insert(Connection, Collection, [Statement], Opts);
 insert(Connection, Collection, Statement, Opts) ->
@@ -225,8 +243,10 @@ update(Connection, Collection, Selector, Update, Upsert, Multi) ->
     Update :: bson:document(),
     Upsert :: boolean(),
     Multi :: boolean(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> {ok, bson:document()} | {error, term()}.
+update(Connection, Collection, Selector, Update, Upsert, Multi, Opts) when erlang:is_map(Opts) ->
+    update(Connection, Collection, Selector, Update, Upsert, Multi, maps:to_list(Opts));
 update(Connection, Collection, Selector, Update, Upsert, Multi, Opts) ->
     Database = mango_connection:database(Connection),
     Statement = maps:from_list([{"q", Selector}, {"u", Update}, {"upsert", Upsert}, {"multi", Multi} | Opts]),
