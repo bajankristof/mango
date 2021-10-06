@@ -1,6 +1,6 @@
 {application, mango,
  [{description, "MongoDB micro-driver for Erlang"},
-  {vsn, "0.4.2"},
+  {vsn, "0.4.3"},
   {registered, []},
   {mod, {mango_app, []}},
   {applications, [kernel, stdlib, bson, poolboy]},
