@@ -36,8 +36,8 @@ database(Connection) ->
 ) -> {ok, mango_message:t()} | {error, term()}.
 request(Connection, Request) ->
     poolboy:transaction(Connection, fun (Worker) ->
-        gen_server:call(Worker, Request)
-    end).
+        gen_server:call(Worker, Request, 60_000)
+    end, 60_000).
 
 -spec request(
     Connection :: mango:connection(),
