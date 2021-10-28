@@ -1,6 +1,6 @@
 services:
     mongodb:
-        image: mongo:4
+        image: mongo:5
         ports: [27017:27017]
     adminmongo:
         depends_on: [mongodb]
