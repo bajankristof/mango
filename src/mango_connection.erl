@@ -8,6 +8,7 @@
     request/3
 ]).
 -export([
+    start/1,
     start_link/1,
     child_spec/2,
     stop/1
@@ -26,18 +27,14 @@
 
 -spec database(Connection :: mango:connection()) -> term().
 database(Connection) ->
-    poolboy:transaction(Connection, fun (Worker) ->
-        gen_server:call(Worker, database)
-    end).
+    do_call(Connection, database, 10_000).
 
 -spec request(
     Connection :: mango:connection(),
     Request :: mango_message:t()
 ) -> {ok, mango_message:t()} | {error, term()}.
 request(Connection, Request) ->
-    poolboy:transaction(Connection, fun (Worker) ->
-        gen_server:call(Worker, Request, 60_000)
-    end, 60_000).
+    request(Connection, Request, 60_000).
 
 -spec request(
     Connection :: mango:connection(),
@@ -45,25 +42,18 @@ request(Connection, Request) ->
     Timeout :: integer()
 ) -> {ok, mango_message:t()} | {error, term()}.
 request(Connection, Request, Timeout) ->
-    poolboy:transaction(Connection, fun (Worker) ->
-        gen_server:call(Worker, Request, Timeout)
-    end, Timeout).
+    do_call(Connection, Request, Timeout).
+
+-spec start(Opts :: list() | map()) -> {ok, pid()} | {error, term()}.
+start(Opts) ->
+    do_start(start, Opts).
 
 -spec start_link(Opts :: {worker, {init_arg, map()}} | list() | map()) ->
     {ok, pid()} | {error, term()}.
 start_link({worker, #init_arg{opts = Opts}}) ->
     gen_server:start_link(?MODULE, Opts, []);
-start_link(Opts) when erlang:is_list(Opts) ->
-    start_link(maps:from_list(Opts));
-start_link(#{database := Database} = Opts)
-        when erlang:is_atom(Database)
-        orelse erlang:is_binary(Database) ->
-    poolboy:start_link([
-        {worker_module, ?MODULE},
-        {size, maps:get(pool_size, Opts, 10)},
-        {max_overflow, maps:get(max_overflow, Opts, 0)}
-        | maps:to_list(maps:with([name], Opts))
-    ], {worker, #init_arg{opts = Opts}}).
+start_link(Opts) ->
+    do_start(start_link, Opts).
 
 -spec child_spec(Id :: term(), Opts :: list() | map()) -> map().
 child_spec(Id, Opts) ->
@@ -131,3 +121,23 @@ loop_reply(Payload, #state{queue = Queue} = State) ->
             loop_reply(Remainder, State#state{queue = maps:without([Id], Queue)});
         _ -> {noreply, State#state{buffer = Payload}}
     end.
+
+do_call(Connection, Request, Timeout) ->
+    Ref = poolboy:transaction(Connection, fun (Worker) ->
+        gen_server:send_request(Worker, Request)
+    end),
+    case gen_server:wait_response(Ref, Timeout) of
+        {reply, Reply} -> Reply;
+        {error, Reason} -> exit(Reason);
+        timeout -> exit(timeout)
+    end.
+
+do_start(Fun, Opts) when erlang:is_list(Opts) ->
+    do_start(Fun, maps:from_list(Opts));
+do_start(Fun, Opts) ->
+    poolboy:Fun([
+        {worker_module, ?MODULE},
+        {size, maps:get(pool_size, Opts, 10)},
+        {max_overflow, maps:get(max_overflow, Opts, 0)}
+        | maps:to_list(maps:with([name], Opts))
+    ], {worker, #init_arg{opts = Opts}}).
