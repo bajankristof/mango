@@ -303,7 +303,10 @@ ping(Connection) ->
     Database :: mango:database()
 ) -> mango_op_msg:response().
 ping(Connection, Database) ->
-    run(Connection, Database, [{ping, 1}]).
+    case run(Connection, Database, [{ping, 1}]) of
+        {ok, _} -> pong;
+        {error, _} -> pang
+    end.
 
 -spec top(
     Connection :: mango:connection()
