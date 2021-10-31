@@ -61,11 +61,11 @@ aggregate(Connection, Collection, Pipeline, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     Pipeline :: bson:array(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, cursor()} | {error, term()}.
 aggregate(Connection, Collection, Pipeline, Opts0, Timeout) ->
-    Opts = [{cursor, #{"batchSize" => 0}} | opts(Opts0)],
+    Opts = [{<<"cursor">>, #{<<"batchSize">> => 0}} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:aggregate(Database, Collection, Pipeline, Opts),
     run_command(Connection, Command, Timeout).
@@ -86,11 +86,11 @@ count(Connection, Collection, Selector, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, integer()} | {error, term()}.
 count(Connection, Collection, Selector, Opts0, Timeout) ->
-    Opts = [{'query', Selector} | opts(Opts0)],
+    Opts = [{<<"query">>, Selector} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:count(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -115,11 +115,11 @@ delete(Connection, Collection, Selector, Limit, Opts) ->
     Collection :: collection(),
     Selector :: bson:document(),
     Limit :: integer(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 delete(Connection, Collection, Selector, Limit, Opts, Timeout) ->
-    Statement = maps:from_list([{"q", Selector}, {"limit", Limit} | opts(Opts)]),
+    Statement = maps:from_list([{<<"q">>, Selector}, {<<"limit">>, Limit} | opts(Opts)]),
     Database = mango_connection:database(Connection),
     Command = mango_command:delete(Database, Collection, [Statement], []),
     run_command(Connection, Command, Timeout).
@@ -141,11 +141,11 @@ distinct(Connection, Collection, Key, Selector, Opts) ->
     Collection :: collection(),
     Key :: atom() | binary() | list(),
     Selector :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, list()} | {error, term()}.
 distinct(Connection, Collection, Key, Selector, Opts0, Timeout) ->
-    Opts = [{'query', Selector} | opts(Opts0)],
+    Opts = [{<<"query">>, Selector} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:distinct(Database, Collection, Key, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -171,11 +171,11 @@ find(Connection, Collection, Selector, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, cursor()} | {error, term()}.
 find(Connection, Collection, Selector, Opts0, Timeout) ->
-    Opts = [{"filter", Selector}, {"batchSize", 0}, {"singleBatch", false} | opts(Opts0)],
+    Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 0}, {<<"singleBatch">>, false} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:find(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -195,11 +195,11 @@ find_and_remove(Connection, Collection, Selector, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> bson:document() | undefined | {error, term()}.
 find_and_remove(Connection, Collection, Selector, Opts0, Timeout) ->
-    Opts = [{"query", Selector}, {"remove", true} | opts(Opts0)],
+    Opts = [{<<"query">>, Selector}, {<<"remove">>, true} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:find_and_modify(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -222,11 +222,11 @@ find_and_update(Connection, Collection, Selector, Update, Opts) ->
     Collection :: collection(),
     Selector :: bson:document(),
     Update :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> bson:document() | undefined | {error, term()}.
 find_and_update(Connection, Collection, Selector, Update, Opts0, Timeout) ->
-    Opts = [{"query", Selector}, {"update", Update} | opts(Opts0)],
+    Opts = [{<<"query">>, Selector}, {<<"update">>, Update} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:find_and_modify(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -252,11 +252,11 @@ find_one(Connection, Collection, Selector, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     Selector :: bson:document(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> bson:document() | undefined | {error, term()}.
 find_one(Connection, Collection, Selector, Opts0, Timeout) ->
-    Opts = [{"filter", Selector}, {"batchSize", 1}, {"singleBatch", true} | opts(Opts0)],
+    Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 1}, {<<"singleBatch">>, true} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:find(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
@@ -277,8 +277,8 @@ insert(Connection, Collection, Statement, Opts) ->
     Connection :: connection(),
     Collection :: collection(),
     What :: bson:document() | [bson:document()],
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 insert(Connection, Collection, #{} = Statement, Opts, Timeout) ->
     insert(Connection, Collection, [Statement], Opts, Timeout);
@@ -306,12 +306,17 @@ update(Connection, Collection, Selector, Update, Upsert, Multi, Opts) ->
     Update :: bson:document(),
     Upsert :: boolean(),
     Multi :: boolean(),
-    Timeout :: timeout(),
-    Opts :: list() | map()
+    Opts :: list() | map(),
+    Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 update(Connection, Collection, Selector, Update, Upsert, Multi, Opts, Timeout) ->
     Database = mango_connection:database(Connection),
-    Statement = maps:from_list([{"q", Selector}, {"u", Update}, {"upsert", Upsert}, {"multi", Multi} | opts(Opts)]),
+    Statement = maps:from_list([
+        {<<"q">>, Selector},
+        {<<"u">>, Update},
+        {<<"upsert">>, Upsert},
+        {<<"multi">>, Multi}
+        | opts(Opts)]),
     Command = mango_command:update(Database, Collection, [Statement], []),
     run_command(Connection, Command, Timeout).
 
