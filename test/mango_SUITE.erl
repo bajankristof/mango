@@ -40,13 +40,13 @@ end_per_suite(_) ->
 init_per_group(mango_connection, Config) ->
     [{group, mango_connection} | Config];
 init_per_group(Group, Config) ->
-    {ok, Connection} = mango_connection:start(#{database => Group}),
+    {ok, Connection} = mango:start(#{database => Group}),
     [{group, Group}, {connection, Connection} | Config].
 
 end_per_group(mango_connection, _) -> ok;
 end_per_group(_, Config) ->
     Connection = ?config(connection, Config),
-    mango_connection:stop(Connection).
+    mango:stop(Connection).
 
 init_per_testcase(Case, Config) ->
     [{'case', Case} | Config].
@@ -59,27 +59,30 @@ end_per_testcase(_, _) -> ok.
 
 can_connect_with_opts_map(Config) ->
     Case = ?config('case', Config),
-    {ok, Connection} = mango_connection:start_link(#{database => Case}),
-    ok = mango_connection:stop(Connection).
+    {ok, Connection} = mango:start_link(#{database => Case}),
+    ok = mango:stop(Connection).
 
 can_connect_with_opts_list(Config) ->
     Case = ?config('case', Config),
-    {ok, Connection} = mango_connection:start_link([{database, Case}]),
-    ok = mango_connection:stop(Connection).
+    {ok, Connection} = mango:start_link([{database, Case}]),
+    ok = mango:stop(Connection).
 
 %% === mango_command === %%
 
 can_ping_connection(Config) ->
     Connection = ?config(connection, Config),
-    ?assertMatch(pong, mango_command:ping(Connection)).
+    Command = mango_command:ping(),
+    ?assertMatch({ok, #{}}, mango:run_command(Connection, Command)).
 
 can_list_databases(Config) ->
     Connection = ?config(connection, Config),
-    ?assertMatch({ok, #{<<"databases">> := [_|_]}}, mango_command:list_databases(Connection, [])).
+    Command = mango_command:list_databases([]),
+    ?assertMatch({ok, #{<<"databases">> := [_|_]}}, mango:run_command(Connection, Command)).
 
 can_run_commands(Config) ->
     Connection = ?config(connection, Config),
-    ?assertMatch({ok, #{<<"users">> := _}}, mango_command:run(Connection, admin, [{"usersInfo", 1}])).
+    Command = mango_command:new({"usersInfo", 1}, admin),
+    ?assertMatch({ok, #{<<"users">> := _}}, mango:run_command(Connection, Command)).
 
 %% === mango === %%
 

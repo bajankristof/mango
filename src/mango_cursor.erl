@@ -1,5 +1,7 @@
 -module(mango_cursor).
 
+-import(mango_command, [opts/1]).
+
 -export([exhaust/2, exhaust/3]).
 -export([get_batch/2, get_batch/3]).
 -export([get_more/2, get_more/3]).
@@ -15,14 +17,15 @@ exhaust(Connection, Cursor) ->
     Cursor :: mango:cursor(),
     Opts :: list() | map()
 ) -> {ok, [bson:document()]} | {error, term()}.
-exhaust(Connection, Cursor, Opts) when erlang:is_map(Opts) ->
-    exhaust(Connection, Cursor, maps:to_list(Opts));
 exhaust(Connection, Cursor, Opts) ->
     bson:loop(fun (Acc) ->
         case get_batch(Connection, Cursor, Opts) of
-            {nofin, Documents} -> {true, Acc ++ Documents};
-            {fin, Documents} -> {false, {ok, Acc ++ Documents}};
-            {error, Reason} -> {false, {error, Reason}}
+            {nofin, Documents} ->
+                {true, Acc ++ Documents};
+            {fin, Documents} ->
+                {false, {ok, Acc ++ Documents}};
+            {error, Reason} ->
+                {false, {error, Reason}}
         end
     end, []).
 
@@ -47,10 +50,14 @@ get_more(_, #{<<"id">> := 0}, _) -> {fin, []};
 get_more(Connection, Cursor, Opts) when erlang:is_map(Opts) ->
     get_more(Connection, Cursor, maps:to_list(Opts));
 get_more(Connection, Cursor, Opts) ->
-    case mango_command:get_more(Connection, Cursor, Opts) of
-        {ok, #{<<"cursor">> := #{<<"id">> := 0, <<"nextBatch">> := Documents}}} -> {fin, Documents};
-        {ok, #{<<"cursor">> := #{<<"nextBatch">> := Documents}}} -> {nofin, Documents};
-        {error, Reason} -> {error, Reason}
+    Command = mango_command:get_more(Cursor, opts(Opts)),
+    case mango_connection:command(Connection, Command) of
+        {ok, #{<<"cursor">> := #{<<"id">> := 0, <<"nextBatch">> := Documents}}} ->
+            {fin, Documents};
+        {ok, #{<<"cursor">> := #{<<"nextBatch">> := Documents}}} ->
+            {nofin, Documents};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 %% @equiv get_one(Connection, Cursor, [])
@@ -62,10 +69,8 @@ get_one(Connection, Cursor) ->
     Cursor :: mango:cursor(),
     Opts :: list() | map()
 ) -> {fin | nofin, undefined | bson:document()} | {error, term()}.
-get_one(Connection, Cursor, Opts) when erlang:is_map(Opts) ->
-    get_one(Connection, Cursor, maps:to_list(Opts));
 get_one(Connection, Cursor, Opts) ->
-    case get_more(Connection, Cursor, [{"batchSize", 1} | Opts]) of
+    case get_more(Connection, Cursor, [{"batchSize", 1} | opts(Opts)]) of
         {error, Reason} -> {error, Reason};
         {Statement, [Document]} -> {Statement, Document};
         {_, []} -> {fin, undefined}
@@ -78,11 +83,12 @@ close(Connection, Cursor) ->
 -spec close(
     Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: list()
+    Opts :: list() | map()
 ) -> ok | {error, term()}.
 close(_, #{<<"id">> := 0}, _) -> ok;
 close(Connection, Cursor, Opts) ->
-    case mango_command:kill_cursor(Connection, Cursor, Opts) of
+    Command = mango_command:kill_cursor(Cursor, Opts),
+    case mango_connection:command(Connection, Command) of
         {error, Reason} -> {error, Reason};
         {ok, _} -> ok
     end.

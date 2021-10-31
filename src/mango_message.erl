@@ -44,11 +44,11 @@ op_code(<<_:12/binary, Chunk:4/binary, _/binary>>) ->
 -spec body(Message :: t()) -> binary().
 body(<<_:16/binary, Body/binary>>) -> Body.
 
--spec read(Payload :: binary()) -> {ok, t(), binary()} | {error, term()}.
+-spec read(Payload :: binary()) -> {fin, t(), binary()} | nofin.
 read(Payload) when erlang:is_binary(Payload) ->
     Assert = length(Payload),
     case Payload of
         <<Message:Assert/binary, Remainder/binary>> ->
-            {ok, Message, Remainder};
-        _ -> {error, <<"EINCOMPLETE">>}
+            {fin, Message, Remainder};
+        _ -> nofin
     end.

@@ -1,341 +1,300 @@
 -module(mango_command).
 
+%% API Functions
+-export([
+    new/2,
+    new/3,
+    opts/1
+]).
 %% Aggregation Commands
 %% https://docs.mongodb.com/manual/reference/command/#aggregation-commands
 -export([
-    aggregate/5,
-    count/4,
-    distinct/5
+    aggregate/4,
+    count/3,
+    distinct/4
 ]).
 %% Query and Write Operation Commands
 %% https://docs.mongodb.com/manual/reference/command/#query-and-write-operation-commands
 -export([
-    delete/5,
-    find/4,
-    find_and_modify/4,
-    get_more/3,
-    insert/5,
-    update/5
+    delete/4,
+    find/3,
+    find_and_modify/3,
+    get_more/2,
+    insert/4,
+    update/4
 ]).
 %% Administration Commands
 %% https://docs.mongodb.com/manual/reference/command/#administration-commands
 -export([
-    compact/4,
-    create_collection/4,
-    create_indexes/5,
-    current_op/2,
-    drop_collection/4,
-    drop_database/3,
-    drop_indexes/5,
-    kill_cursor/3,
-    kill_cursors/5,
-    list_collections/3,
-    list_databases/2,
-    list_indexes/4,
-    re_index/4,
-    rename_collection/4
+    compact/3,
+    create_collection/3,
+    create_indexes/4,
+    current_op/1,
+    drop_collection/3,
+    drop_database/2,
+    drop_indexes/4,
+    kill_cursor/2,
+    kill_cursors/4,
+    list_collections/2,
+    list_databases/1,
+    list_indexes/3,
+    re_index/3,
+    rename_collection/3
 ]).
 %% Diagnostic Commands
 %% https://docs.mongodb.com/manual/reference/command/#diagnostic-commands
 -export([
-    ping/1,
-    ping/2,
-    top/1,
-    explain/4
+    ping/0,
+    top/0,
+    explain/3
 ]).
-%% db.runCommand
-%% run(Connection, Database, Command)
-%% db.adminCommand
-%% run(Connection, admin, Command)
--export([run/3]).
 
 -include_lib("bson/include/bson.hrl").
+-include("mango.hrl").
 
--type t() :: proplists:proplist().
+-type t() :: #'mango.command'{}.
 -export_type([t/0]).
+
+%% @equiv new(Command, Database, [])
+new(Command, Database) ->
+    new(Command, Database, []).
+
+-spec new(
+    Command :: tuple(),
+    Database :: mango:database(),
+    Opts :: list() | map()
+) -> t().
+new(Command, Database, Opts) ->
+    #'mango.command'{command = Command, database = Database, opts = opts(Opts)}.
+
+-spec opts(Opts :: list() | map()) -> list().
+opts(Opts) when erlang:is_map(Opts) ->
+    maps:to_list(Opts);
+opts(Opts) when erlang:is_list(Opts) ->
+    Opts.
 
 %% === Aggregation Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#aggregation-commands
 
 -spec aggregate(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Pipeline :: list(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-aggregate(Connection, Database, Collection, Pipeline, Opts) ->
-    run(Connection, Database, [{aggregate, Collection}, {"pipeline", Pipeline} | Opts]).
+    Opts :: list() | map()
+) -> t().
+aggregate(Database, Collection, Pipeline, Opts) ->
+    new({aggregate, Collection}, Database, [{"pipeline", Pipeline} | opts(Opts)]).
 
 -spec count(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-count(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{count, Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+count(Database, Collection, Opts) ->
+    new({count, Collection}, Database, Opts).
 
 -spec distinct(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Key :: atom() | binary(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-distinct(Connection, Database, Collection, Key, Opts) ->
-    run(Connection, Database, [{distinct, Collection}, {"key", Key} | Opts]).
+    Opts :: list() | map()
+) -> t().
+distinct(Database, Collection, Key, Opts) ->
+    new({distinct, Collection}, Database, [{"key", Key} | opts(Opts)]).
 
 %% === Query and Write Operation Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#query-and-write-operation-commands
 
 -spec delete(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Statements :: [bson:document()],
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-delete(Connection, Database, Collection, Statements, Opts) ->
-    run(Connection, Database, [{delete, Collection}, {"deletes", Statements} | Opts]).
+    Opts :: list() | map()
+) -> t().
+delete(Database, Collection, Statements, Opts) ->
+    new({delete, Collection}, Database, [{"deletes", Statements} | opts(Opts)]).
 
 -spec find(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-find(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{find, Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+find(Database, Collection, Opts) ->
+    new({find, Collection}, Database, Opts).
 
 -spec find_and_modify(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-find_and_modify(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{"findAndModify", Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+find_and_modify(Database, Collection, Opts) ->
+    new({"findAndModify", Collection}, Database, Opts).
 
 -spec get_more(
-    Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-get_more(Connection, #{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
+    Opts :: list() | map()
+) -> t().
+get_more(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
-    get_more(Connection, Database, Collection, Id, Opts);
-get_more(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
-    get_more(Connection, Cursor, Opts).
+    get_more(Database, Collection, Id, Opts);
+get_more(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
+    get_more(Cursor, Opts).
 
 -spec get_more(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Id :: integer(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-get_more(Connection, Database, Collection, Id, Opts) ->
-    run(Connection, Database, [{"getMore", #'bson.long'{value = Id}}, {"collection", Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+get_more(Database, Collection, Id, Opts) ->
+    new({"getMore", #'bson.long'{value = Id}}, Database, [{"collection", Collection} | opts(Opts)]).
 
 -spec insert(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Documents :: [bson:document()],
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-insert(Connection, Database, Collection, Documents, Opts) ->
-    run(Connection, Database, [{insert, Collection}, {"documents", Documents} | Opts]).
+    Opts :: list() | map()
+) -> t().
+insert(Database, Collection, Documents, Opts) ->
+    new({insert, Collection}, Database, [{"documents", Documents} | opts(Opts)]).
 
 -spec update(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Statements :: [bson:document()],
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-update(Connection, Database, Collection, Statements, Opts) ->
-    run(Connection, Database, [{update, Collection}, {"updates", Statements} | Opts]).
+    Opts :: list() | map()
+) -> t().
+update(Database, Collection, Statements, Opts) ->
+    new({update, Collection}, Database, [{"updates", Statements} | opts(Opts)]).
 
 %% === Administration Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#administration-commands
 
 -spec compact(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-compact(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{compact, Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+compact(Database, Collection, Opts) ->
+    new({compact, Collection}, Database, Opts).
 
 -spec create_collection(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-create_collection(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{create, Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+create_collection(Database, Collection, Opts) ->
+    new({create, Collection}, Database, Opts).
 
 -spec create_indexes(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Specs :: [bson:document()],
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-create_indexes(Connection, Database, Collection, Specs, Opts) ->
-    run(Connection, Database, [{"createIndexes", Collection}, {"indexes", Specs} | Opts]).
+    Opts :: list() | map()
+) -> t().
+create_indexes(Database, Collection, Specs, Opts) ->
+    new({"createIndexes", Collection}, Database, [{"indexes", Specs} | opts(Opts)]).
 
--spec current_op(
-    Connection :: mango:connection(),
-    All :: boolean()
-) -> mango_op_msg:response().
-current_op(Connection, true) ->
-    run(Connection, admin, [{"currentOp", 1}, {"$all", true}]);
-current_op(Connection, false) ->
-    run(Connection, admin, [{"currentOp", 1}, {"$ownOps", true}]).
+-spec current_op(All :: boolean()) -> t().
+current_op(true) ->
+    new({"currentOp", 1}, admin, [{"$all", true}]);
+current_op(false) ->
+    new({"currentOp", 1}, admin, [{"$ownOps", true}]).
 
 -spec drop_collection(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-drop_collection(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{"drop", Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+drop_collection(Database, Collection, Opts) ->
+    new({"drop", Collection}, Database, Opts).
 
 -spec drop_database(
-    Connection :: mango:connection(),
     Database :: mango:database(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-drop_database(Connection, Database, Opts) ->
-    run(Connection, Database, [{"dropDatabase", 1} | Opts]).
+    Opts :: list() | map()
+) -> t().
+drop_database(Database, Opts) ->
+    new({"dropDatabase", 1}, Database, Opts).
 
 -spec drop_indexes(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Spec :: integer() | list(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-drop_indexes(Connection, Database, Collection, Spec, Opts) ->
-    run(Connection, Database, [{"dropIndexes", Collection}, {"indexes", Spec} | Opts]).
+    Opts :: list() | map()
+) -> t().
+drop_indexes(Database, Collection, Spec, Opts) ->
+    new({"dropIndexes", Collection}, Database, [{"indexes", Spec} | opts(Opts)]).
 
 -spec kill_cursor(
-    Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-kill_cursor(Connection, #{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
+    Opts :: list() | map()
+) -> t().
+kill_cursor(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
-    kill_cursors(Connection, Database, Collection, [Id], Opts);
-kill_cursor(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
-    kill_cursor(Connection, Cursor, Opts).
+    kill_cursors(Database, Collection, [Id], Opts);
+kill_cursor(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
+    kill_cursor(Cursor, Opts).
 
 -spec kill_cursors(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
     Ids :: [integer()],
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-kill_cursors(Connection, Database, Collection, Ids, Opts) ->
+    Opts :: list() | map()
+) -> t().
+kill_cursors(Database, Collection, Ids, Opts) ->
     Cursors = lists:map(fun (Id) -> #'bson.long'{value = Id} end, Ids),
-    run(Connection, Database, [{"killCursors", Collection}, {"cursors", Cursors} | Opts]).
+    new({"killCursors", Collection}, Database, [{"cursors", Cursors} | opts(Opts)]).
 
 -spec list_collections(
-    Connection :: mango:connection(),
     Database :: mango:database(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-list_collections(Connection, Database, Opts) ->
-    run(Connection, Database, [{"listCollections", 1} | Opts]).
+    Opts :: list() | map()
+) -> t().
+list_collections(Database, Opts) ->
+    new({"listCollections", 1}, Database, Opts).
 
--spec list_databases(
-    Connection :: mango:connection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-list_databases(Connection, Opts) ->
-    run(Connection, admin, [{"listDatabases", 1} | Opts]).
+-spec list_databases(Opts :: list() | map()) -> t().
+list_databases(Opts) ->
+    new({"listDatabases", 1}, admin, Opts).
 
 -spec list_indexes(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-list_indexes(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{"listIndexes", Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+list_indexes(Database, Collection, Opts) ->
+    new({"listIndexes", Collection}, Database, Opts).
 
 -spec re_index(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Collection :: mango:collection(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-re_index(Connection, Database, Collection, Opts) ->
-    run(Connection, Database, [{"reIndex", Collection} | Opts]).
+    Opts :: list() | map()
+) -> t().
+re_index(Database, Collection, Opts) ->
+    new({"reIndex", Collection}, Database, Opts).
 
 -spec rename_collection(
-    Connection :: mango:connection(),
     Collection :: mango:namespace(),
     To :: mango:namespace(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-rename_collection(Connection, Collection, To, Opts) ->
-    run(Connection, admin, [{"renameCollection", Collection}, {"to", To} | Opts]).
+    Opts :: list() | map()
+) -> t().
+rename_collection(Collection, To, Opts) ->
+    new({"renameCollection", Collection}, admin, [{"to", To} | opts(Opts)]).
 
 %% === Diagnostic Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#diagnostic-commands
 
--spec ping(
-    Connection :: mango:connection()
-) -> mango_op_msg:response().
-ping(Connection) ->
-    ping(Connection, admin).
+-spec ping() -> t().
+ping() ->
+    new({ping, 1}, admin, []).
 
--spec ping(
-    Connection :: mango:connection(),
-    Database :: mango:database()
-) -> mango_op_msg:response().
-ping(Connection, Database) ->
-    case run(Connection, Database, [{ping, 1}]) of
-        {ok, _} -> pong;
-        {error, _} -> pang
-    end.
-
--spec top(
-    Connection :: mango:connection()
-) -> mango_op_msg:response().
-top(Connection) ->
-    run(Connection, admin, [{top, 1}]).
+-spec top() -> t().
+top() ->
+    new({top, 1}, admin, []).
 
 -spec explain(
-    Connection :: mango:connection(),
     Database :: mango:database(),
     Command :: bson:document(),
-    Opts :: proplists:proplist()
-) -> mango_op_msg:response().
-explain(Connection, Database, Command, Opts) ->
-    run(Connection, Database, [{explain, Command} | Opts]).
-
-%% === db.runCommand ===
-%% run(Connection, Database, Command)
-%% === db.adminCommand ===
-%% run(Connection, admin, Command)
-
--spec run(
-    Connection :: mango:connection(),
-    Database :: mango:database(),
-    Command :: t()
-) -> mango_op_msg:response().
-run(Connection, Database, [{_, _} = Command | Opts]) ->
-    Request = mango_op_msg:request([Command, {"$db", Database} | Opts]),
-    case mango_connection:request(Connection, Request) of
-        {ok, Response} -> mango_op_msg:response(Response);
-        {error, Reason} -> {error, Reason}
-    end.
+    Opts :: list() | map()
+) -> t().
+explain(Database, Command, Opts) ->
+    new({explain, Command}, Database, Opts).
