@@ -2,7 +2,11 @@
 
 -export([encode/1, decode/1]).
 
+-include("mango.hrl").
+
 -spec encode(Command :: map() | list()) -> mango_message:t().
+encode(#'mango.command'{command = Command, database = Database, opts = Opts}) ->
+    encode([Command, {"$db", Database} | Opts]);
 encode(Command) when erlang:is_map(Command) orelse erlang:is_list(Command) ->
     Body = bson:construct([{uint32, 0}, {byte, 0}, {document, Command}]),
     mango_message:new(Body).

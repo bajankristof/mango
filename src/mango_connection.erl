@@ -5,9 +5,7 @@
 -export([
     database/1,
     command/2,
-    command/3,
-    transaction/2,
-    transaction/3
+    command/3
 ]).
 -export([
     start/1,
@@ -43,32 +41,16 @@ command(Connection, Command) ->
     Command :: mango_command:t(),
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
-command(Connection, #'mango.command'{
-    command = Command,
-    database = Database,
-    opts = Opts
-}, Timeout) ->
-    Message = mango_op_msg:encode([Command, {"$db", Database} | Opts]),
-    case transaction(Connection, Message, Timeout) of
-        {ok, Response} ->
-            Reply = mango_op_msg:decode(Response),
+command(Connection, #'mango.command'{} = Command, Timeout) ->
+    Message = mango_op_msg:encode(Command),
+    case do_call(Connection, {call, Message}, Timeout) of
+        {ok, Payload} ->
+            Reply = mango_op_msg:decode(Payload),
             Status = maps:get(<<"ok">>, Reply),
             case Status of 1.0 -> {ok, Reply}; 0.0 -> {error, Reply} end;
         {error, Reason} ->
             {error, Reason}
     end.
-
-%% @equiv transaction(Connection, Message, ?DEFAULT_TIMEOUT)
-transaction(Connection, Message) ->
-    transaction(Connection, Message, ?DEFAULT_TIMEOUT).
-
--spec transaction(
-    Connection :: mango:connection(),
-    Message :: mango_message:t(),
-    Timeout :: timeout()
-) -> {ok, mango_message:t()} | {error, term()}.
-transaction(Connection, Message, Timeout) ->
-    do_call(Connection, Message, Timeout).
 
 -spec start(Opts :: list() | map()) -> {ok, pid()} | {error, term()}.
 start(Opts) ->
@@ -99,11 +81,11 @@ init(Opts) ->
 
 handle_call(database, _, #state{database = Database} = State) ->
     {reply, Database, State};
-handle_call(_, _, #state{socket = undefined} = State) ->
+handle_call({call, _}, _, #state{socket = undefined} = State) ->
     {reply, {error, nosock}, State};
-handle_call(<<_:16/binary, _/binary>> = Request, Client, #state{socket = Socket, queue = Queue} = State) ->
-    Id = mango_message:request_id(Request),
-    ok = gen_tcp:send(Socket, Request),
+handle_call({call, <<_:16/binary, _/binary>> = Message}, Client, #state{socket = Socket, queue = Queue} = State) ->
+    Id = mango_message:request_id(Message),
+    ok = gen_tcp:send(Socket, Message),
     {noreply, State#state{queue = Queue#{Id => Client}}};
 handle_call(_, _, State) ->
     {reply, {error, badarg}, State}.
@@ -149,13 +131,13 @@ loop_reply(Payload, #state{queue = Queue} = State) ->
     end.
 
 do_call(Connection, Request, Timeout) ->
-    Ref = poolboy:transaction(Connection, fun (Worker) ->
+    RequestId = poolboy:transaction(Connection, fun (Worker) ->
         gen_server:send_request(Worker, Request)
     end),
-    case gen_server:wait_response(Ref, Timeout) of
+    case gen_server:wait_response(RequestId, Timeout) of
         {reply, Reply} -> Reply;
-        {error, Reason} -> exit(Reason);
-        timeout -> exit(timeout)
+        {error, {Reason, _}} -> {error, Reason};
+        timeout -> {error, timeout}
     end.
 
 do_start(Fun, Opts) when erlang:is_list(Opts) ->
