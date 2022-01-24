@@ -93,7 +93,7 @@ can_insert_documents(Config) ->
 can_find_documents(Config) ->
     Connection = ?config(connection, Config),
     {ok, Cursor} = mango:find(Connection, ?MODULE, #{}),
-    ?assertMatch({ok, [_|_]}, mango_cursor:exhaust(Connection, Cursor)).
+    ?assertMatch({ok, [_|_]}, mango_cursor:exhaust(Cursor)).
 
 can_delete_documents(Config) ->
     Connection = ?config(connection, Config),

@@ -2,24 +2,51 @@
 
 -import(mango_command, [opts/1]).
 
--export([exhaust/2, exhaust/3]).
--export([get_batch/2, get_batch/3]).
--export([get_more/2, get_more/3]).
--export([get_one/2, get_one/3]).
--export([close/2, close/3]).
+-export([new/2, set_opts/2, from_op/2]).
+-export([exhaust/1, exhaust/2]).
+-export([get_batch/1, get_batch/2]).
+-export([get_more/1, get_more/2]).
+-export([get_one/1, get_one/2]).
+-export([close/1, close/2]).
 
-%% @equiv exhaust(Connection, Cursor, [])
-exhaust(Connection, Cursor) ->
-    exhaust(Connection, Cursor, []).
+-include("mango.hrl").
+-include("./constants.hrl").
 
--spec exhaust(
+-spec new(
     Connection :: mango:connection(),
+    Source :: bson:document()
+) -> mango:cursor().
+new(Connection, #{<<"id">> := Id, <<"ns">> := Namespace}) ->
+    [Database, Collection] = binary:split(Namespace, <<".">>),
+    #'mango.cursor'{id = Id, connection = Connection, database = Database, collection = Collection};
+new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Source}) ->
+    new(Connection, Source).
+
+-spec set_opts(
     Cursor :: mango:cursor(),
     Opts :: list() | map()
+) -> mango:cursor().
+set_opts(#'mango.cursor'{} = Cursor, Opts) ->
+    Cursor#'mango.cursor'{opts = opts(Opts)}.
+
+-spec from_op(Connection :: mango:connection(), Source :: {ok | error, bson:document()}) ->
+    {ok, mango:cursor()} | {error, bson:document()}.
+from_op(_, {error, Reason}) ->
+    {error, Reason};
+from_op(Connection, {ok, #{<<"cursor">> := Source}}) ->
+    {ok, new(Connection, Source)}.
+
+%% @equiv exhaust(Cursor, ?DEFAULT_TIMEOUT)
+exhaust(Cursor) ->
+    exhaust(Cursor, ?DEFAULT_TIMEOUT).
+
+-spec exhaust(
+    Cursor :: mango:cursor(),
+    Timeout :: timeout()
 ) -> {ok, [bson:document()]} | {error, term()}.
-exhaust(Connection, Cursor, Opts) ->
+exhaust(Cursor, Timeout) ->
     bson:loop(fun (Acc) ->
-        case get_batch(Connection, Cursor, Opts) of
+        case get_batch(Cursor, Timeout) of
             {nofin, Documents} ->
                 {true, Acc ++ Documents};
             {fin, Documents} ->
@@ -29,29 +56,26 @@ exhaust(Connection, Cursor, Opts) ->
         end
     end, []).
 
-%% @equiv get_more(Connection, Cursor)
-get_batch(Connection, Cursor) ->
-    get_more(Connection, Cursor).
+%% @equiv get_more(Cursor, ?DEFAULT_TIMEOUT)
+get_batch(Cursor) ->
+    get_more(Cursor, ?DEFAULT_TIMEOUT).
 
-%% @equiv get_more(Connection, Cursor, Opts)
-get_batch(Connection, Cursor, Opts) ->
-    get_more(Connection, Cursor, Opts).
+%% @equiv get_more(Cursor, Timeout)
+get_batch(Cursor, Timeout) ->
+    get_more(Cursor, Timeout).
 
-%% @equiv get_more(Connection, Cursor, [])
-get_more(Connection, Cursor) ->
-    get_more(Connection, Cursor, []).
+%% @equiv get_more(Cursor, ?DEFAULT_TIMEOUT)
+get_more(Cursor) ->
+    get_more(Cursor, ?DEFAULT_TIMEOUT).
 
 -spec get_more(
-    Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: list() | map()
+    Timeout :: timeout()
 ) -> {fin | nofin, [bson:document()]} | {error, term()}.
-get_more(_, #{<<"id">> := 0}, _) -> {fin, []};
-get_more(Connection, Cursor, Opts) when erlang:is_map(Opts) ->
-    get_more(Connection, Cursor, maps:to_list(Opts));
-get_more(Connection, Cursor, Opts) ->
-    Command = mango_command:get_more(Cursor, opts(Opts)),
-    case mango_connection:command(Connection, Command) of
+get_more(#'mango.cursor'{id = 0}, _) -> {fin, []};
+get_more(#'mango.cursor'{} = Cursor, Timeout) ->
+    Command = mango_command:get_more(Cursor, Cursor#'mango.cursor'.opts),
+    case mango_connection:command(Cursor#'mango.cursor'.connection, Command, Timeout) of
         {ok, #{<<"cursor">> := #{<<"id">> := 0, <<"nextBatch">> := Documents}}} ->
             {fin, Documents};
         {ok, #{<<"cursor">> := #{<<"nextBatch">> := Documents}}} ->
@@ -60,35 +84,34 @@ get_more(Connection, Cursor, Opts) ->
             {error, Reason}
     end.
 
-%% @equiv get_one(Connection, Cursor, [])
-get_one(Connection, Cursor) ->
-    get_one(Connection, Cursor, []).
+%% @equiv get_one(Cursor, ?DEFAULT_TIMEOUT)
+get_one(Cursor) ->
+    get_one(Cursor, ?DEFAULT_TIMEOUT).
 
 -spec get_one(
-    Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: list() | map()
+    Timeout :: timeout()
 ) -> {fin | nofin, undefined | bson:document()} | {error, term()}.
-get_one(Connection, Cursor, Opts) ->
-    case get_more(Connection, Cursor, [{"batchSize", 1} | opts(Opts)]) of
+get_one(Cursor, Timeout) ->
+    Opts = [{<<"batchSize">>, 1} | Cursor#'mango.cursor'.opts],
+    case get_more(Cursor#'mango.cursor'{opts = Opts}, Timeout) of
         {error, Reason} -> {error, Reason};
         {Statement, [Document]} -> {Statement, Document};
         {_, []} -> {fin, undefined}
     end.
 
-%% @equiv close(Connection, Cursor, [])
-close(Connection, Cursor) ->
-    close(Connection, Cursor, []).
+%% @equiv close(Cursor, ?DEFAULT_TIMEOUT)
+close(Cursor) ->
+    close(Cursor, ?DEFAULT_TIMEOUT).
 
 -spec close(
-    Connection :: mango:connection(),
     Cursor :: mango:cursor(),
-    Opts :: list() | map()
+    Timeout :: timeout()
 ) -> ok | {error, term()}.
-close(_, #{<<"id">> := 0}, _) -> ok;
-close(Connection, Cursor, Opts) ->
-    Command = mango_command:kill_cursor(Cursor, Opts),
-    case mango_connection:command(Connection, Command) of
+close(#'mango.cursor'{id = 0}, _) -> ok;
+close(#'mango.cursor'{connection = Connection} = Cursor, Timeout) ->
+    Command = mango_command:kill_cursor(Cursor, Cursor#'mango.cursor'.opts),
+    case mango_connection:command(Connection, Command, Timeout) of
         {error, Reason} -> {error, Reason};
         {ok, _} -> ok
     end.

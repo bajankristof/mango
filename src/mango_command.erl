@@ -131,9 +131,11 @@ find_and_modify(Database, Collection, Opts) ->
     new({<<"findAndModify">>, Collection}, Database, Opts).
 
 -spec get_more(
-    Cursor :: mango:cursor(),
+    Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
 ) -> t().
+get_more(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
+    get_more(Database, Collection, Id, Opts);
 get_more(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
     get_more(Database, Collection, Id, Opts);
@@ -226,9 +228,11 @@ drop_indexes(Database, Collection, Spec, Opts) ->
     new({<<"dropIndexes">>, Collection}, Database, [{<<"indexes">>, Spec} | opts(Opts)]).
 
 -spec kill_cursor(
-    Cursor :: mango:cursor(),
+    Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
 ) -> t().
+kill_cursor(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
+    kill_cursors(Database, Collection, [Id], Opts);
 kill_cursor(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
     kill_cursors(Database, Collection, [Id], Opts);

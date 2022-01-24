@@ -22,7 +22,7 @@
 -type database() :: atom() | binary().
 -type collection() :: atom() | binary().
 -type namespace() :: binary().
--type cursor() :: bson:document().
+-type cursor() :: #'mango.cursor'{}.
 -type command() :: #'mango.command'{}.
 -export_type([
     connection/0,
@@ -68,7 +68,7 @@ aggregate(Connection, Collection, Pipeline, Opts0, Timeout) ->
     Opts = [{<<"cursor">>, #{<<"batchSize">> => 0}} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:aggregate(Database, Collection, Pipeline, Opts),
-    run_command(Connection, Command, Timeout).
+    mango_cursor:from_op(Connection, run_command(Connection, Command, Timeout)).
 
 %% @equiv count(Connection, Collection, #{})
 count(Connection, Collection) ->
@@ -178,10 +178,7 @@ find(Connection, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 0}, {<<"singleBatch">>, false} | opts(Opts0)],
     Database = mango_connection:database(Connection),
     Command = mango_command:find(Database, Collection, Opts),
-    case run_command(Connection, Command, Timeout) of
-        {ok, Cursor} -> {ok, Cursor};
-        {error, Reason} -> {error, Reason}
-    end.
+    mango_cursor:from_op(Connection, run_command(Connection, Command, Timeout)).
 
 %% @equiv find_and_remove(Connection, Collection, Selector, [])
 find_and_remove(Connection, Collection, Selector) ->
