@@ -147,5 +147,5 @@ do_start(Fun, Opts) ->
         {worker_module, ?MODULE},
         {size, maps:get(pool_size, Opts, 10)},
         {max_overflow, 0},
-        {strategy, fifo},
+        {strategy, fifo}
     ], {worker, #init_arg{opts = Opts}}).
