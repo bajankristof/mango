@@ -3,9 +3,9 @@
 -import(mango_command, [opts/1]).
 
 -export([start/1, start_link/1, stop/1]).
--export([aggregate/3, aggregate/4]).
+-export([aggregate/3, aggregate/4, aggregate/5]).
 -export([count/2, count/3, count/4, count/5]).
--export([delete/3, delete/4, delete/5]).
+-export([delete/3, delete/4, delete/5, delete/6]).
 -export([distinct/3, distinct/4, distinct/5, distinct/6]).
 -export([find/2, find/3, find/4, find/5]).
 -export([find_and_remove/3, find_and_remove/4, find_and_remove/5]).
