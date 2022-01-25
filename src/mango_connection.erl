@@ -146,6 +146,6 @@ do_start(Fun, Opts) ->
     poolboy:Fun([
         {worker_module, ?MODULE},
         {size, maps:get(pool_size, Opts, 10)},
-        {max_overflow, maps:get(max_overflow, Opts, 0)}
-        | maps:to_list(maps:with([name], Opts))
+        {max_overflow, 0},
+        {strategy, fifo},
     ], {worker, #init_arg{opts = Opts}}).
