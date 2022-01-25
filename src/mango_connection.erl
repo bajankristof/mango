@@ -148,4 +148,5 @@ do_start(Fun, Opts) ->
         {size, maps:get(pool_size, Opts, 10)},
         {max_overflow, 0},
         {strategy, fifo}
+        | maps:to_list(maps:with([name], Opts))
     ], {worker, #init_arg{opts = Opts}}).
