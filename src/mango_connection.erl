@@ -121,7 +121,7 @@ maybe_reconnect(#state{} = State) ->
 loop_reply(<<>>, #state{} = State) ->
     {noreply, State};
 loop_reply(Payload, #state{queue = Queue} = State) ->
-    case mango_message:read(Payload) of
+    case mango_message:parse(Payload) of
         {fin, Reply, Remainder} ->
             Id = mango_message:response_to(Reply),
             Client = maps:get(Id, Queue, undefined),

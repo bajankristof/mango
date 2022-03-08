@@ -10,7 +10,7 @@
     op_code/1,
     body/1
 ]).
--export([read/1]).
+-export([parse/1]).
 
 -type t() :: binary().
 -type header() :: binary().
@@ -44,8 +44,10 @@ op_code(<<_:12/binary, Chunk:4/binary, _/binary>>) ->
 -spec body(Message :: t()) -> binary().
 body(<<_:16/binary, Body/binary>>) -> Body.
 
--spec read(Payload :: binary()) -> {fin, t(), binary()} | nofin.
-read(Payload) when erlang:is_binary(Payload) ->
+-spec parse(Payload :: binary()) -> {fin, t(), binary()} | nofin.
+parse(Payload) when erlang:byte_size(Payload) < 4 ->
+    nofin;
+parse(Payload) when erlang:is_binary(Payload) ->
     Assert = length(Payload),
     case Payload of
         <<Message:Assert/binary, Remainder/binary>> ->
