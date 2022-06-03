@@ -105,8 +105,10 @@ handle_info(connect, #state{socket = undefined} = State) ->
     {noreply, State, {continue, connect}};
 handle_info({tcp, Socket, Payload}, #state{socket = Socket, buffer = Buffer} = State) ->
     loop_reply(<<Buffer/binary, Payload/binary>>, State#state{buffer = <<>>});
-handle_info({tcp_closed, Socket}, #state{socket = Socket} = State) ->
-    maybe_reconnect(State).
+handle_info({tcp_closed, Socket}, #state{host = Host, port = Port, socket = Socket} = State) ->
+    logger:notice("mango: Socket ~p to ~ts:~p closed", [Socket, Host, Port]),
+    clear_queue({error, tcp_closed}, State),
+    maybe_reconnect(State#state{buffer = <<>>, queue = #{}}).
 
 terminate(_, #state{socket = undefined}) -> ok;
 terminate(_, #state{socket = Socket}) ->
@@ -129,6 +131,12 @@ loop_reply(Payload, #state{queue = Queue} = State) ->
             loop_reply(Remainder, State#state{queue = maps:without([Id], Queue)});
         nofin -> {noreply, State#state{buffer = Payload}}
     end.
+
+clear_queue(Reply, #state{queue = Queue} = State) ->
+    maps:foreach(fun (_, Client) ->
+        gen_server:reply(Client, Reply)
+    end, Queue),
+    State#state{queue = #{}}.
 
 do_call(Connection, Request, Timeout) ->
     RequestId = poolboy:transaction(Connection, fun (Worker) ->
