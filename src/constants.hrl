@@ -1,1 +1,0 @@
--define(DEFAULT_TIMEOUT, 60_000).

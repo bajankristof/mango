@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_app).
 
 -behaviour(application).

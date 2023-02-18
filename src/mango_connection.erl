@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_connection).
 
 -behaviour(gen_server).
@@ -23,9 +24,9 @@
 ]).
 
 -include("mango.hrl").
--include("./constants.hrl").
+-include("./_defaults.hrl").
 
--record(state, {host, port, database, socket, queue = #{}, buffer = <<>>}).
+-record(state, {opts, host, port, database, socket, queue = #{}, buffer = <<>>}).
 -record(init_arg, {opts}).
 
 -spec database(Connection :: mango:connection()) -> term().
@@ -52,13 +53,13 @@ command(Connection, #'mango.command'{} = Command, Timeout) ->
             {error, Reason}
     end.
 
--spec start(Opts :: list() | map()) -> {ok, pid()} | {error, term()}.
+-spec start(Opts :: mango:start_opts()) -> {ok, pid()} | {error, term()}.
 start(Opts) ->
     do_start(start, Opts).
 
--spec start_link(Opts :: {worker, {init_arg, map()}} | list() | map()) ->
+-spec start_link(Opts :: mango:start_opts()) ->
     {ok, pid()} | {error, term()}.
-start_link({worker, #init_arg{opts = Opts}}) ->
+start_link(#init_arg{opts = Opts}) ->
     gen_server:start_link(?MODULE, Opts, []);
 start_link(Opts) ->
     do_start(start_link, Opts).
@@ -74,6 +75,7 @@ stop(Connection) ->
 init(Opts) ->
     erlang:process_flag(trap_exit, true),
     {ok, #state{
+        opts = Opts,
         host = maps:get(host, Opts, "127.0.0.1"),
         port = maps:get(port, Opts, 27017),
         database = maps:get(database, Opts)
@@ -81,34 +83,31 @@ init(Opts) ->
 
 handle_call(database, _, #state{database = Database} = State) ->
     {reply, Database, State};
-handle_call({call, _}, _, #state{socket = undefined} = State) ->
-    {reply, {error, nosock}, State};
-handle_call({call, <<_:16/binary, _/binary>> = Message}, Client, #state{socket = Socket, queue = Queue} = State) ->
+handle_call({call, <<_:16/binary, _/binary>> = Message}, Caller, #state{socket = Socket, queue = Queue} = State) ->
     Id = mango_message:request_id(Message),
     ok = gen_tcp:send(Socket, Message),
-    {noreply, State#state{queue = Queue#{Id => Client}}};
+    {noreply, State#state{queue = Queue#{Id => Caller}}};
 handle_call(_, _, State) ->
-    {reply, {error, badarg}, State}.
+    {noreply, State}.
 
 handle_cast(_, State) ->
     {noreply, State}.
 
-handle_continue(connect, #state{socket = undefined, host = Host, port = Port} = State) ->
-    {noreply, State, {continue, {socket, gen_tcp:connect(Host, Port, [binary])}}};
-handle_continue({socket, {error, Reason}}, #state{host = Host, port = Port} = State) ->
-    logger:error("mango: Connection to ~ts:~p failed due to ~p", [Host, Port, Reason]),
-    maybe_reconnect(State);
-handle_continue({socket, {ok, Socket}}, #state{socket = undefined} = State) ->
-    {noreply, State#state{socket = Socket}}.
+handle_continue(connect, #state{opts = Opts, host = Host, port = Port} = State) ->
+    case mango_internal:attempt({gen_tcp, connect, [Host, Port, [binary]]}, Opts) of
+        {ok, Socket} ->
+            {noreply, State#state{socket = Socket}};
+        {error, Reason} ->
+            {stop, Reason, State}
+    end.
 
-handle_info(connect, #state{socket = undefined} = State) ->
-    {noreply, State, {continue, connect}};
 handle_info({tcp, Socket, Payload}, #state{socket = Socket, buffer = Buffer} = State) ->
     loop_reply(<<Buffer/binary, Payload/binary>>, State#state{buffer = <<>>});
 handle_info({tcp_closed, Socket}, #state{host = Host, port = Port, socket = Socket} = State) ->
     logger:notice("mango: Socket ~p to ~ts:~p closed", [Socket, Host, Port]),
-    clear_queue({error, tcp_closed}, State),
-    maybe_reconnect(State#state{buffer = <<>>, queue = #{}}).
+    {stop, tcp_closed, State};
+handle_info(_, State) ->
+    {noreply, State}.
 
 terminate(_, #state{socket = undefined}) -> ok;
 terminate(_, #state{socket = Socket}) ->
@@ -116,27 +115,17 @@ terminate(_, #state{socket = Socket}) ->
 
 %% private functions
 
-maybe_reconnect(#state{} = State) ->
-    erlang:send_after(5000, self(), connect),
-    {noreply, State#state{socket = undefined}}.
-
 loop_reply(<<>>, #state{} = State) ->
     {noreply, State};
 loop_reply(Payload, #state{queue = Queue} = State) ->
     case mango_message:parse(Payload) of
         {fin, Reply, Remainder} ->
             Id = mango_message:response_to(Reply),
-            Client = maps:get(Id, Queue, undefined),
-            ok = gen_server:reply(Client, {ok, Reply}),
+            Caller = maps:get(Id, Queue, undefined),
+            ok = gen_server:reply(Caller, {ok, Reply}),
             loop_reply(Remainder, State#state{queue = maps:without([Id], Queue)});
         nofin -> {noreply, State#state{buffer = Payload}}
     end.
-
-clear_queue(Reply, #state{queue = Queue} = State) ->
-    maps:foreach(fun (_, Client) ->
-        gen_server:reply(Client, Reply)
-    end, Queue),
-    State#state{queue = #{}}.
 
 do_call(Connection, Request, Timeout) ->
     RequestId = poolboy:transaction(Connection, fun (Worker) ->
@@ -148,8 +137,6 @@ do_call(Connection, Request, Timeout) ->
         timeout -> {error, timeout}
     end.
 
-do_start(Fun, Opts) when erlang:is_list(Opts) ->
-    do_start(Fun, maps:from_list(Opts));
 do_start(Fun, Opts) ->
     poolboy:Fun([
         {worker_module, ?MODULE},
@@ -157,4 +144,4 @@ do_start(Fun, Opts) ->
         {max_overflow, 0},
         {strategy, fifo}
         | maps:to_list(maps:with([name], Opts))
-    ], {worker, #init_arg{opts = Opts}}).
+    ], #init_arg{opts = Opts}).

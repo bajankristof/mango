@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_message).
 
 -compile({no_auto_import, [length/1]}).

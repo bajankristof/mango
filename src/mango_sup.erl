@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_sup).
 
 -behaviour(supervisor).

@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_op_msg).
 
 -export([encode/1, decode/1]).

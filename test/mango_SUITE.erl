@@ -15,8 +15,7 @@ all() -> [
 
 groups() -> [
     {mango_connection, [parallel], [
-        can_connect_with_opts_map,
-        can_connect_with_opts_list
+        can_connect
     ]},
     {mango_command, [parallel], [
         can_ping_connection,
@@ -57,14 +56,9 @@ end_per_testcase(_, _) -> ok.
 
 %% === mango_connection === %%
 
-can_connect_with_opts_map(Config) ->
+can_connect(Config) ->
     Case = ?config('case', Config),
     {ok, Connection} = mango:start_link(#{database => Case}),
-    ok = mango:stop(Connection).
-
-can_connect_with_opts_list(Config) ->
-    Case = ?config('case', Config),
-    {ok, Connection} = mango:start_link([{database, Case}]),
     ok = mango:stop(Connection).
 
 %% === mango_command === %%

@@ -10,7 +10,7 @@
 -export([close/1, close/2]).
 
 -include("mango.hrl").
--include("./constants.hrl").
+-include("./_defaults.hrl").
 
 -spec new(
     Connection :: mango:connection(),

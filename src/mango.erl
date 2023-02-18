@@ -16,8 +16,17 @@
 -export([run_command/2, run_command/3]).
 
 -include("mango.hrl").
--include("./constants.hrl").
+-include("./_defaults.hrl").
 
+-type start_opts() :: #{
+    name := gen_server:server_name(),
+    host := inet:hostname(),
+    port := inet:port_number(),
+    seeds := [inet:hostname(), {inet:hostname(), inet:port_number()}],
+    database := binary(),
+    retry_delay := pos_integer(),
+    retry_attempts := infinity | pos_integer()
+}.
 -type connection() :: pid() | atom() | {via, atom(), term()}.
 -type database() :: atom() | binary().
 -type collection() :: atom() | binary().
@@ -25,6 +34,7 @@
 -type cursor() :: #'mango.cursor'{}.
 -type command() :: #'mango.command'{}.
 -export_type([
+    start_opts/0,
     connection/0,
     database/0,
     collection/0,
@@ -35,12 +45,16 @@
 
 %% === API Functions ===
 
--spec start(Opts :: map() | list()) -> supervisor:on_start().
-start(Opts) ->
+-spec start(Opts :: start_opts()) -> supervisor:on_start().
+start(#{seeds := _} = Opts) ->
+    mango_replica_set:start(Opts);
+start(#{} = Opts) ->
     mango_connection:start(Opts).
 
--spec start_link(Opts :: map() | list()) -> supervisor:on_start().
-start_link(Opts) ->
+-spec start_link(Opts :: start_opts()) -> supervisor:on_start().
+start_link(#{seeds := _} = Opts) ->
+    mango_replica_set:start_link(Opts);
+start_link(#{} = Opts) ->
     mango_connection:start_link(Opts).
 
 -spec stop(Connection :: connection()) -> ok.

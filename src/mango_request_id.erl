@@ -1,3 +1,4 @@
+%% @hidden
 -module(mango_request_id).
 
 -export([get/0]).

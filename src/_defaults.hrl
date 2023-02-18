@@ -1,0 +1,3 @@
+-define(DEFAULT_TIMEOUT, 60_000).
+-define(DEFAULT_RETRY_DELAY, 1000).
+-define(DEFAULT_RETRY_ATTEMPTS, infinity).
