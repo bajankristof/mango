@@ -44,6 +44,7 @@
 %% Diagnostic Commands
 %% https://docs.mongodb.com/manual/reference/command/#diagnostic-commands
 -export([
+    hello/0,
     ping/0,
     top/0,
     explain/3
@@ -51,9 +52,6 @@
 
 -include_lib("bson/include/bson.hrl").
 -include("mango.hrl").
-
--type t() :: #'mango.command'{}.
--export_type([t/0]).
 
 %% @equiv new(Command, Database, [])
 new(Command, Database) ->
@@ -63,7 +61,7 @@ new(Command, Database) ->
     Command :: tuple(),
     Database :: mango:database(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 new(Command, Database, Opts) ->
     #'mango.command'{command = Command, database = Database, opts = opts(Opts)}.
 
@@ -81,7 +79,7 @@ opts(Opts) when erlang:is_list(Opts) ->
     Collection :: mango:collection(),
     Pipeline :: list(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 aggregate(Database, Collection, Pipeline, Opts) ->
     new({<<"aggregate">>, Collection}, Database, [{<<"pipeline">>, Pipeline} | opts(Opts)]).
 
@@ -89,7 +87,7 @@ aggregate(Database, Collection, Pipeline, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 count(Database, Collection, Opts) ->
     new({<<"count">>, Collection}, Database, Opts).
 
@@ -98,7 +96,7 @@ count(Database, Collection, Opts) ->
     Collection :: mango:collection(),
     Key :: atom() | binary(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 distinct(Database, Collection, Key, Opts) ->
     new({<<"distinct">>, Collection}, Database, [{<<"key">>, Key} | opts(Opts)]).
 
@@ -110,7 +108,7 @@ distinct(Database, Collection, Key, Opts) ->
     Collection :: mango:collection(),
     Statements :: [bson:document()],
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 delete(Database, Collection, Statements, Opts) ->
     new({<<"delete">>, Collection}, Database, [{<<"deletes">>, Statements} | opts(Opts)]).
 
@@ -118,7 +116,7 @@ delete(Database, Collection, Statements, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 find(Database, Collection, Opts) ->
     new({<<"find">>, Collection}, Database, Opts).
 
@@ -126,14 +124,14 @@ find(Database, Collection, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 find_and_modify(Database, Collection, Opts) ->
     new({<<"findAndModify">>, Collection}, Database, Opts).
 
 -spec get_more(
     Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 get_more(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
     get_more(Database, Collection, Id, Opts);
 get_more(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
@@ -147,7 +145,7 @@ get_more(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
     Collection :: mango:collection(),
     Id :: integer(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 get_more(Database, Collection, Id, Opts) ->
     new({<<"getMore">>, #'bson.long'{value = Id}}, Database, [{<<"collection">>, Collection} | opts(Opts)]).
 
@@ -156,7 +154,7 @@ get_more(Database, Collection, Id, Opts) ->
     Collection :: mango:collection(),
     Documents :: [bson:document()],
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 insert(Database, Collection, Documents, Opts) ->
     new({<<"insert">>, Collection}, Database, [{<<"documents">>, Documents} | opts(Opts)]).
 
@@ -165,7 +163,7 @@ insert(Database, Collection, Documents, Opts) ->
     Collection :: mango:collection(),
     Statements :: [bson:document()],
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 update(Database, Collection, Statements, Opts) ->
     new({<<"update">>, Collection}, Database, [{<<"updates">>, Statements} | opts(Opts)]).
 
@@ -176,7 +174,7 @@ update(Database, Collection, Statements, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 compact(Database, Collection, Opts) ->
     new({<<"compact">>, Collection}, Database, Opts).
 
@@ -184,7 +182,7 @@ compact(Database, Collection, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 create_collection(Database, Collection, Opts) ->
     new({<<"create">>, Collection}, Database, Opts).
 
@@ -193,11 +191,11 @@ create_collection(Database, Collection, Opts) ->
     Collection :: mango:collection(),
     Specs :: [bson:document()],
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 create_indexes(Database, Collection, Specs, Opts) ->
     new({<<"createIndexes">>, Collection}, Database, [{<<"indexes">>, Specs} | opts(Opts)]).
 
--spec current_op(All :: boolean()) -> t().
+-spec current_op(All :: boolean()) -> mango:command().
 current_op(true) ->
     new({<<"currentOp">>, 1}, <<"admin">>, [{<<"$all">>, true}]);
 current_op(false) ->
@@ -207,14 +205,14 @@ current_op(false) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 drop_collection(Database, Collection, Opts) ->
     new({<<"drop">>, Collection}, Database, Opts).
 
 -spec drop_database(
     Database :: mango:database(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 drop_database(Database, Opts) ->
     new({<<"dropDatabase">>, 1}, Database, Opts).
 
@@ -223,14 +221,14 @@ drop_database(Database, Opts) ->
     Collection :: mango:collection(),
     Spec :: integer() | list(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 drop_indexes(Database, Collection, Spec, Opts) ->
     new({<<"dropIndexes">>, Collection}, Database, [{<<"indexes">>, Spec} | opts(Opts)]).
 
 -spec kill_cursor(
     Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 kill_cursor(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
     kill_cursors(Database, Collection, [Id], Opts);
 kill_cursor(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
@@ -244,7 +242,7 @@ kill_cursor(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) -
     Collection :: mango:collection(),
     Ids :: [integer()],
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 kill_cursors(Database, Collection, Ids, Opts) ->
     Cursors = lists:map(fun (Id) -> #'bson.long'{value = Id} end, Ids),
     new({<<"killCursors">>, Collection}, Database, [{<<"cursors">>, Cursors} | opts(Opts)]).
@@ -252,11 +250,11 @@ kill_cursors(Database, Collection, Ids, Opts) ->
 -spec list_collections(
     Database :: mango:database(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 list_collections(Database, Opts) ->
     new({<<"listCollections">>, 1}, Database, Opts).
 
--spec list_databases(Opts :: list() | map()) -> t().
+-spec list_databases(Opts :: list() | map()) -> mango:command().
 list_databases(Opts) ->
     new({<<"listDatabases">>, 1}, admin, Opts).
 
@@ -264,7 +262,7 @@ list_databases(Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 list_indexes(Database, Collection, Opts) ->
     new({<<"listIndexes">>, Collection}, Database, Opts).
 
@@ -272,7 +270,7 @@ list_indexes(Database, Collection, Opts) ->
     Database :: mango:database(),
     Collection :: mango:collection(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 re_index(Database, Collection, Opts) ->
     new({<<"reIndex">>, Collection}, Database, Opts).
 
@@ -280,18 +278,22 @@ re_index(Database, Collection, Opts) ->
     Collection :: mango:namespace(),
     To :: mango:namespace(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 rename_collection(Collection, To, Opts) ->
     new({<<"renameCollection">>, Collection}, <<"admin">>, [{<<"to">>, To} | opts(Opts)]).
 
 %% === Diagnostic Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#diagnostic-commands
 
--spec ping() -> t().
+-spec hello() -> mango:command().
+hello() ->
+    new({<<"hello">>, 1}, <<"admin">>, []).
+
+-spec ping() -> mango:command().
 ping() ->
     new({<<"ping">>, 1}, <<"admin">>, []).
 
--spec top() -> t().
+-spec top() -> mango:command().
 top() ->
     new({<<"top">>, 1}, <<"admin">>, []).
 
@@ -299,6 +301,6 @@ top() ->
     Database :: mango:database(),
     Command :: bson:document(),
     Opts :: list() | map()
-) -> t().
+) -> mango:command().
 explain(Database, Command, Opts) ->
     new({<<"explain">>, Command}, Database, Opts).

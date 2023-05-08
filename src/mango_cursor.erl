@@ -75,7 +75,7 @@ get_more(Cursor) ->
 get_more(#'mango.cursor'{id = 0}, _) -> {fin, []};
 get_more(#'mango.cursor'{} = Cursor, Timeout) ->
     Command = mango_command:get_more(Cursor, Cursor#'mango.cursor'.opts),
-    case mango_connection:command(Cursor#'mango.cursor'.connection, Command, Timeout) of
+    case mango_topology:command(Cursor#'mango.cursor'.connection, Command, Timeout) of
         {ok, #{<<"cursor">> := #{<<"id">> := 0, <<"nextBatch">> := Documents}}} ->
             {fin, Documents};
         {ok, #{<<"cursor">> := #{<<"nextBatch">> := Documents}}} ->
@@ -111,7 +111,7 @@ close(Cursor) ->
 close(#'mango.cursor'{id = 0}, _) -> ok;
 close(#'mango.cursor'{connection = Connection} = Cursor, Timeout) ->
     Command = mango_command:kill_cursor(Cursor, Cursor#'mango.cursor'.opts),
-    case mango_connection:command(Connection, Command, Timeout) of
+    case mango_topology:command(Connection, Command, Timeout) of
         {error, Reason} -> {error, Reason};
         {ok, _} -> ok
     end.

@@ -1,3 +1,9 @@
+-define(DEFAULT_HOST, "127.0.0.1").
+-define(DEFAULT_PORT, 27017).
+-define(DEFAULT_SOCKET_MODULE, gen_tcp).
+-define(DEFAULT_MIN_POOL_SIZE, 10).
+-define(DEFAULT_MIN_BACKOFF, 1_000).
+-define(DEFAULT_MAX_BACKOFF, 30_000).
+-define(DEFAULT_MAX_ATTEMPTS, infinity).
+-define(DEFAULT_READ_PREFERENCE, primary).
 -define(DEFAULT_TIMEOUT, 60_000).
--define(DEFAULT_RETRY_DELAY, 1000).
--define(DEFAULT_RETRY_ATTEMPTS, infinity).

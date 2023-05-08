@@ -39,7 +39,8 @@ end_per_suite(_) ->
 init_per_group(mango_connection, Config) ->
     [{group, mango_connection} | Config];
 init_per_group(Group, Config) ->
-    {ok, Connection} = mango:start(#{database => Group}),
+    {ok, Connection} = mango:start_link(#{database => Group}),
+    true = erlang:unlink(Connection),
     [{group, Group}, {connection, Connection} | Config].
 
 end_per_group(mango_connection, _) -> ok;

@@ -2,7 +2,7 @@
 
 -import(mango_command, [opts/1]).
 
--export([start/1, start_link/1, stop/1]).
+-export([child_spec/2, start_link/1, stop/1]).
 -export([aggregate/3, aggregate/4, aggregate/5]).
 -export([count/2, count/3, count/4, count/5]).
 -export([delete/3, delete/4, delete/5, delete/6]).
@@ -22,12 +22,22 @@
     name := gen_server:server_name(),
     host := inet:hostname(),
     port := inet:port_number(),
-    seeds := [inet:hostname(), {inet:hostname(), inet:port_number()}],
+    hosts := [inet:hostname() | {inet:hostname(), inet:port_number()}],
     database := binary(),
-    retry_delay := pos_integer(),
-    retry_attempts := infinity | pos_integer()
+    socket_module := gen_tcp | ssl,
+    socket_opts := [inet:inet_backend() | gen_tcp:connect_option() | ssl:tls_client_option()],
+    min_pool_size := pos_integer(),
+    max_pool_size := pos_integer(),
+    min_backoff := pos_integer(),
+    max_backoff := pos_integer(),
+    max_attempts := infinity | pos_integer(),
+    read_preference := primary | primary_preferred | secondary | secondary_preferred | nearest,
+    after_connect := mfa() | fun(),
+    after_ping := mfa() | fun()
 }.
--type connection() :: pid() | atom() | {via, atom(), term()}.
+-type socket_opts() :: [inet:inet_backend() | gen_tcp:connect_option() | ssl:tls_client_option()].
+-type socket() :: #'mango.socket'{}.
+-type connection() :: gen_server:server_ref().
 -type database() :: atom() | binary().
 -type collection() :: atom() | binary().
 -type namespace() :: binary().
@@ -35,6 +45,8 @@
 -type command() :: #'mango.command'{}.
 -export_type([
     start_opts/0,
+    socket_opts/0,
+    socket/0,
     connection/0,
     database/0,
     collection/0,
@@ -43,23 +55,19 @@
     command/0
 ]).
 
-%% === API Functions ===
+%% === Topology Functions ===
 
--spec start(Opts :: start_opts()) -> supervisor:on_start().
-start(#{seeds := _} = Opts) ->
-    mango_replica_set:start(Opts);
-start(#{} = Opts) ->
-    mango_connection:start(Opts).
+-spec child_spec(Id :: supervisor:child_id(), Opts :: start_opts()) -> supervisor:child_spec().
+child_spec(Id, Opts) ->
+    mango_topology:child_spec(Id, Opts).
 
 -spec start_link(Opts :: start_opts()) -> supervisor:on_start().
-start_link(#{seeds := _} = Opts) ->
-    mango_replica_set:start_link(Opts);
-start_link(#{} = Opts) ->
-    mango_connection:start_link(Opts).
+start_link(Opts) ->
+    mango_topology:start_link(Opts).
 
 -spec stop(Connection :: connection()) -> ok.
 stop(Connection) ->
-    mango_connection:stop(Connection).
+    mango_topology:stop(Connection).
 
 %% === Aggregation Functions ===
 
@@ -80,7 +88,7 @@ aggregate(Connection, Collection, Pipeline, Opts) ->
 ) -> {ok, cursor()} | {error, term()}.
 aggregate(Connection, Collection, Pipeline, Opts0, Timeout) ->
     Opts = [{<<"cursor">>, #{<<"batchSize">> => 0}} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:aggregate(Database, Collection, Pipeline, Opts),
     mango_cursor:from_op(Connection, run_command(Connection, Command, Timeout)).
 
@@ -105,7 +113,7 @@ count(Connection, Collection, Selector, Opts) ->
 ) -> {ok, integer()} | {error, term()}.
 count(Connection, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"query">>, Selector} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:count(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
         {ok, #{<<"n">> := Count}} -> {ok, Count};
@@ -134,7 +142,7 @@ delete(Connection, Collection, Selector, Limit, Opts) ->
 ) -> {ok, bson:document()} | {error, term()}.
 delete(Connection, Collection, Selector, Limit, Opts, Timeout) ->
     Statement = maps:from_list([{<<"q">>, Selector}, {<<"limit">>, Limit} | opts(Opts)]),
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:delete(Database, Collection, [Statement], []),
     run_command(Connection, Command, Timeout).
 
@@ -160,7 +168,7 @@ distinct(Connection, Collection, Key, Selector, Opts) ->
 ) -> {ok, list()} | {error, term()}.
 distinct(Connection, Collection, Key, Selector, Opts0, Timeout) ->
     Opts = [{<<"query">>, Selector} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:distinct(Database, Collection, Key, Opts),
     case run_command(Connection, Command, Timeout) of
         {ok, #{<<"values">> := Values}} -> {ok, Values};
@@ -190,7 +198,7 @@ find(Connection, Collection, Selector, Opts) ->
 ) -> {ok, cursor()} | {error, term()}.
 find(Connection, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 0}, {<<"singleBatch">>, false} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:find(Database, Collection, Opts),
     mango_cursor:from_op(Connection, run_command(Connection, Command, Timeout)).
 
@@ -211,7 +219,7 @@ find_and_remove(Connection, Collection, Selector, Opts) ->
 ) -> bson:document() | undefined | {error, term()}.
 find_and_remove(Connection, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"query">>, Selector}, {<<"remove">>, true} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:find_and_modify(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
         {error, Reason} -> {error, Reason};
@@ -238,7 +246,7 @@ find_and_update(Connection, Collection, Selector, Update, Opts) ->
 ) -> bson:document() | undefined | {error, term()}.
 find_and_update(Connection, Collection, Selector, Update, Opts0, Timeout) ->
     Opts = [{<<"query">>, Selector}, {<<"update">>, Update} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:find_and_modify(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
         {error, Reason} -> {error, Reason};
@@ -268,7 +276,7 @@ find_one(Connection, Collection, Selector, Opts) ->
 ) -> bson:document() | undefined | {error, term()}.
 find_one(Connection, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 1}, {<<"singleBatch">>, true} | opts(Opts0)],
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:find(Database, Collection, Opts),
     case run_command(Connection, Command, Timeout) of
         {ok, #{<<"cursor">> := #{<<"firstBatch">> := [Document]}}} -> Document;
@@ -294,7 +302,7 @@ insert(Connection, Collection, Statement, Opts) ->
 insert(Connection, Collection, #{} = Statement, Opts, Timeout) ->
     insert(Connection, Collection, [Statement], Opts, Timeout);
 insert(Connection, Collection, Statement, Opts, Timeout) ->
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Command = mango_command:insert(Database, Collection, Statement, Opts),
     run_command(Connection, Command, Timeout).
 
@@ -321,7 +329,7 @@ update(Connection, Collection, Selector, Update, Upsert, Multi, Opts) ->
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 update(Connection, Collection, Selector, Update, Upsert, Multi, Opts, Timeout) ->
-    Database = mango_connection:database(Connection),
+    Database = mango_topology:database(Connection),
     Statement = maps:from_list([
         {<<"q">>, Selector},
         {<<"u">>, Update},
@@ -341,4 +349,4 @@ run_command(Connection, Command) ->
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 run_command(Connection, #'mango.command'{} = Command, Timeout) ->
-    mango_connection:command(Connection, Command, Timeout).
+    mango_topology:command(Connection, Command, Timeout).

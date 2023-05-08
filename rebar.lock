@@ -1,6 +1,6 @@
 {"1.2.0",
 [{<<"bson">>,
-  {git,"git://github.com/bajankristof/bson.git",
+  {git,"https://github.com/bajankristof/bson.git",
        {ref,"41677729b54a321e13d4474c75f4ea2d27b8dd18"}},
   0},
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.2">>},0}]}.
