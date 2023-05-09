@@ -58,9 +58,10 @@ command(Connection, Command) ->
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 command(Connection, Command, Timeout) ->
-    poolboy:transaction(Connection, fun (Worker) ->
-        mango_connection:command(Worker, Command, Timeout)
-    end, Timeout).
+    Operation = poolboy:transaction(Connection, fun (Worker) ->
+        mango_connection:execute(Worker, Command)
+    end),
+    mango_connection:await(Operation, Timeout).
 
 %% === Gen Server Callbacks ===
 
@@ -87,10 +88,8 @@ terminate(Reason, State) ->
 %% === Internal Functions ===
 
 pool_args(#{} = Opts) ->
-    MinSize = maps:get(min_pool_size, Opts, ?DEFAULT_MIN_POOL_SIZE),
-    MaxSize = maps:get(max_pool_size, Opts, MinSize * 2),
     [{worker_module, mango_connection},
-        {size, MinSize},
-        {max_overflow, MaxSize - MinSize},
+        {size, maps:get(pool_size, Opts, ?DEFAULT_POOL_SIZE)},
+        {max_overflow, 0},
         {strategy, fifo}
         | maps:to_list(maps:with([name], Opts))].

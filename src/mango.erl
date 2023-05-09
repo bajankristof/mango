@@ -24,19 +24,14 @@
     port := inet:port_number(),
     hosts := [inet:hostname() | {inet:hostname(), inet:port_number()}],
     database := binary(),
-    socket_module := gen_tcp | ssl,
-    socket_opts := [inet:inet_backend() | gen_tcp:connect_option() | ssl:tls_client_option()],
-    min_pool_size := pos_integer(),
-    max_pool_size := pos_integer(),
+    pool_size := pos_integer(),
     min_backoff := pos_integer(),
     max_backoff := pos_integer(),
     max_attempts := infinity | pos_integer(),
     read_preference := primary | primary_preferred | secondary | secondary_preferred | nearest,
-    after_connect := mfa() | fun(),
-    after_ping := mfa() | fun()
+    retry_reads := boolean(),
+    retry_writes := boolean()
 }.
--type socket_opts() :: [inet:inet_backend() | gen_tcp:connect_option() | ssl:tls_client_option()].
--type socket() :: #'mango.socket'{}.
 -type connection() :: gen_server:server_ref().
 -type database() :: atom() | binary().
 -type collection() :: atom() | binary().
@@ -45,8 +40,6 @@
 -type command() :: #'mango.command'{}.
 -export_type([
     start_opts/0,
-    socket_opts/0,
-    socket/0,
     connection/0,
     database/0,
     collection/0,

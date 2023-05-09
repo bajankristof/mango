@@ -9,7 +9,8 @@
     request_id/1,
     response_to/1,
     op_code/1,
-    body/1
+    body/1,
+    take/1
 ]).
 
 -type t() :: binary().
@@ -58,3 +59,12 @@ op_code(<<_:12/binary, Chunk:4/binary, _/binary>>) ->
 
 -spec body(Message :: t()) -> binary().
 body(<<_:16/binary, Body/binary>>) -> Body.
+
+-spec take(Buffer :: binary()) -> {t(), binary()} | error.
+take(Buffer) ->
+    Length = length(Buffer),
+    case Buffer of
+        <<Message:Length/binary, Rest/binary>> ->
+            {Message, Rest};
+        _ -> error
+    end.

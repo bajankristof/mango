@@ -17,7 +17,7 @@ end).
     Self = self(),
     Ref = erlang:make_ref(),
     Seq = lists:seq(1, Count),
-    lists:foreach(fun (X) -> erlang:spawn_link(fun () -> catch Fun(X), Self ! Ref end) end, Seq),
+    lists:foreach(fun (X) -> erlang:spawn_link(fun () -> Fun(X), Self ! Ref end) end, Seq),
     lists:foreach(fun (_) -> receive Ref -> ok end end, Seq)
 end).
 
