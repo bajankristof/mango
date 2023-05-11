@@ -22,7 +22,7 @@
     terminate/2
 ]).
 
--include("./_defaults.hrl").
+-include("defaults.hrl").
 
 %% === Topology Callbacks ===
 

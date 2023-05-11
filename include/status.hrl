@@ -1,0 +1,1 @@
+-record('mango.status', {node :: iolist(), role :: primary | secondary, ts, ex, rtt}).

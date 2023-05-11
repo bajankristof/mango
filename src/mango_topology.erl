@@ -11,7 +11,7 @@
     opts/1
 ]).
 
--include("./_defaults.hrl").
+-include("defaults.hrl").
 
 -callback child_spec(Id :: supervisor:child_id(), Opts :: mango:start_opts()) -> supervisor:child_spec().
 -callback start_link(Opts :: mango:start_opts()) -> gen_server:start_ret().

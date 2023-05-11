@@ -22,8 +22,8 @@
 ]).
 
 -include("mango.hrl").
--include("./_defaults.hrl").
--include("./_status.hrl").
+-include("defaults.hrl").
+-include("status.hrl").
 
 -record(state, {
     opts,

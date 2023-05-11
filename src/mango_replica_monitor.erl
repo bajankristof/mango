@@ -17,7 +17,7 @@
     terminate/2
 ]).
 
--include("./_status.hrl").
+-include("status.hrl").
 
 -record(state, {rs, ref, node, opts, storage, connection}).
 

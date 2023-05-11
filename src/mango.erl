@@ -17,7 +17,7 @@
 -export([where/1, pd/1, pd/2]).
 
 -include("mango.hrl").
--include("./_defaults.hrl").
+-include("defaults.hrl").
 
 -type start_opts() :: #{
     name := gen_server:server_name(),
