@@ -4,6 +4,7 @@
 -export([
     new/2,
     new/3,
+    patch/2,
     opts/1
 ]).
 %% Aggregation Commands
@@ -53,6 +54,14 @@
 -include_lib("bson/include/bson.hrl").
 -include("mango.hrl").
 
+-define(readPreference(Pref), {<<"$readPreference">>, #{<<"mode">> => case Pref of
+    primary -> <<"primary">>;
+    primary_preferred -> <<"primaryPreferred">>;
+    secondary -> <<"secondary">>;
+    secondary_preferred -> <<"secondaryPreferred">>;
+    nearest -> <<"nearest">>
+end}}).
+
 %% @equiv new(Command, Database, [])
 new(Command, Database) ->
     new(Command, Database, []).
@@ -63,7 +72,25 @@ new(Command, Database) ->
     Opts :: list() | map()
 ) -> mango:command().
 new(Command, Database, Opts) ->
-    #'mango.command'{command = Command, database = Database, opts = opts(Opts)}.
+    new(write, Command, Database, Opts).
+
+-spec new(
+    Type :: read | write,
+    Command :: mango:command(),
+    Database :: mango:database(),
+    Opts :: list() | map()
+) -> mango:command().
+new(Type, Command, Database, Opts) ->
+    #'mango.command'{type = Type, command = Command, database = Database, opts = opts(Opts)}.
+
+-spec patch(Command :: mango:command(), Opts :: mango:start_opts()) -> mango:command().
+patch(#'mango.command'{type = write, database = '$'} = Command, #{database := Database}) ->
+    Command#'mango.command'{database = Database};
+patch(#'mango.command'{type = read, database = '$', opts = Opts} = Command, #{database := Database, read_preference := Pref}) ->
+    Command#'mango.command'{database = Database, opts = [?readPreference(Pref) | Opts]};
+patch(#'mango.command'{type = read, opts = Opts} = Command, #{read_preference := Pref}) ->
+    Command#'mango.command'{opts = [?readPreference(Pref) | Opts]};
+patch(Command, _) -> Command.
 
 -spec opts(Opts :: list() | map()) -> list().
 opts(Opts) when erlang:is_map(Opts) ->
@@ -81,7 +108,7 @@ opts(Opts) when erlang:is_list(Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 aggregate(Database, Collection, Pipeline, Opts) ->
-    new({<<"aggregate">>, Collection}, Database, [{<<"pipeline">>, Pipeline} | opts(Opts)]).
+    new(read, {<<"aggregate">>, Collection}, Database, [{<<"pipeline">>, Pipeline} | opts(Opts)]).
 
 -spec count(
     Database :: mango:database(),
@@ -89,7 +116,7 @@ aggregate(Database, Collection, Pipeline, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 count(Database, Collection, Opts) ->
-    new({<<"count">>, Collection}, Database, Opts).
+    new(read, {<<"count">>, Collection}, Database, Opts).
 
 -spec distinct(
     Database :: mango:database(),
@@ -98,7 +125,7 @@ count(Database, Collection, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 distinct(Database, Collection, Key, Opts) ->
-    new({<<"distinct">>, Collection}, Database, [{<<"key">>, Key} | opts(Opts)]).
+    new(read, {<<"distinct">>, Collection}, Database, [{<<"key">>, Key} | opts(Opts)]).
 
 %% === Query and Write Operation Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#query-and-write-operation-commands
@@ -118,7 +145,7 @@ delete(Database, Collection, Statements, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 find(Database, Collection, Opts) ->
-    new({<<"find">>, Collection}, Database, Opts).
+    new(read, {<<"find">>, Collection}, Database, Opts).
 
 -spec find_and_modify(
     Database :: mango:database(),
@@ -147,7 +174,7 @@ get_more(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 get_more(Database, Collection, Id, Opts) ->
-    new({<<"getMore">>, #'bson.long'{value = Id}}, Database, [{<<"collection">>, Collection} | opts(Opts)]).
+    new(read, {<<"getMore">>, #'bson.long'{value = Id}}, Database, [{<<"collection">>, Collection} | opts(Opts)]).
 
 -spec insert(
     Database :: mango:database(),
@@ -197,9 +224,9 @@ create_indexes(Database, Collection, Specs, Opts) ->
 
 -spec current_op(All :: boolean()) -> mango:command().
 current_op(true) ->
-    new({<<"currentOp">>, 1}, <<"admin">>, [{<<"$all">>, true}]);
+    new(read, {<<"currentOp">>, 1}, <<"admin">>, [{<<"$all">>, true}]);
 current_op(false) ->
-    new({<<"currentOp">>, 1}, <<"admin">>, [{<<"$ownOps">>, true}]).
+    new(read, {<<"currentOp">>, 1}, <<"admin">>, [{<<"$ownOps">>, true}]).
 
 -spec drop_collection(
     Database :: mango:database(),
@@ -245,18 +272,18 @@ kill_cursor(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) -
 ) -> mango:command().
 kill_cursors(Database, Collection, Ids, Opts) ->
     Cursors = lists:map(fun (Id) -> #'bson.long'{value = Id} end, Ids),
-    new({<<"killCursors">>, Collection}, Database, [{<<"cursors">>, Cursors} | opts(Opts)]).
+    new(read, {<<"killCursors">>, Collection}, Database, [{<<"cursors">>, Cursors} | opts(Opts)]).
 
 -spec list_collections(
     Database :: mango:database(),
     Opts :: list() | map()
 ) -> mango:command().
 list_collections(Database, Opts) ->
-    new({<<"listCollections">>, 1}, Database, Opts).
+    new(read, {<<"listCollections">>, 1}, Database, Opts).
 
 -spec list_databases(Opts :: list() | map()) -> mango:command().
 list_databases(Opts) ->
-    new({<<"listDatabases">>, 1}, admin, Opts).
+    new(read, {<<"listDatabases">>, 1}, admin, Opts).
 
 -spec list_indexes(
     Database :: mango:database(),
@@ -264,7 +291,7 @@ list_databases(Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 list_indexes(Database, Collection, Opts) ->
-    new({<<"listIndexes">>, Collection}, Database, Opts).
+    new(read, {<<"listIndexes">>, Collection}, Database, Opts).
 
 -spec re_index(
     Database :: mango:database(),
@@ -287,15 +314,15 @@ rename_collection(Collection, To, Opts) ->
 
 -spec hello() -> mango:command().
 hello() ->
-    new({<<"hello">>, 1}, <<"admin">>, []).
+    new(read, {<<"hello">>, 1}, <<"admin">>, []).
 
 -spec ping() -> mango:command().
 ping() ->
-    new({<<"ping">>, 1}, <<"admin">>, []).
+    new(read, {<<"ping">>, 1}, <<"admin">>, []).
 
 -spec top() -> mango:command().
 top() ->
-    new({<<"top">>, 1}, <<"admin">>, []).
+    new(read, {<<"top">>, 1}, <<"admin">>, []).
 
 -spec explain(
     Database :: mango:database(),
@@ -303,4 +330,4 @@ top() ->
     Opts :: list() | map()
 ) -> mango:command().
 explain(Database, Command, Opts) ->
-    new({<<"explain">>, Command}, Database, Opts).
+    new(read, {<<"explain">>, Command}, Database, Opts).

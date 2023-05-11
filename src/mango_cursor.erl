@@ -2,7 +2,7 @@
 
 -import(mango_command, [opts/1]).
 
--export([new/2, set_opts/2, from_op/2]).
+-export([new/2, set_opts/2]).
 -export([exhaust/1, exhaust/2]).
 -export([get_batch/1, get_batch/2]).
 -export([get_more/1, get_more/2]).
@@ -16,10 +16,10 @@
     Connection :: mango:connection(),
     Source :: bson:document()
 ) -> mango:cursor().
-new(Connection, #{<<"id">> := Id, <<"ns">> := Namespace}) ->
+new(Connection, #{<<"id">> := Id, <<"ns">> := Namespace, <<"firstBatch">> := Batch}) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
-    #'mango.cursor'{id = Id, connection = Connection, database = Database, collection = Collection};
-new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Source}) ->
+    #'mango.cursor'{id = Id, connection = Connection, database = Database, collection = Collection, first_batch = Batch};
+new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _, <<"firstBatch">> := _} = Source}) ->
     new(Connection, Source).
 
 -spec set_opts(
@@ -29,13 +29,6 @@ new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Source}) ->
 set_opts(#'mango.cursor'{} = Cursor, Opts) ->
     Cursor#'mango.cursor'{opts = opts(Opts)}.
 
--spec from_op(Connection :: mango:connection(), Source :: {ok | error, bson:document()}) ->
-    {ok, mango:cursor()} | {error, bson:document()}.
-from_op(_, {error, Reason}) ->
-    {error, Reason};
-from_op(Connection, {ok, #{<<"cursor">> := Source}}) ->
-    {ok, new(Connection, Source)}.
-
 %% @equiv exhaust(Cursor, ?DEFAULT_TIMEOUT)
 exhaust(Cursor) ->
     exhaust(Cursor, ?DEFAULT_TIMEOUT).
@@ -44,7 +37,7 @@ exhaust(Cursor) ->
     Cursor :: mango:cursor(),
     Timeout :: timeout()
 ) -> {ok, [bson:document()]} | {error, term()}.
-exhaust(Cursor, Timeout) ->
+exhaust(#'mango.cursor'{first_batch = Acc0} = Cursor, Timeout) ->
     bson:loop(fun (Acc) ->
         case get_batch(Cursor, Timeout) of
             {nofin, Documents} ->
@@ -54,7 +47,7 @@ exhaust(Cursor, Timeout) ->
             {error, Reason} ->
                 {false, {error, Reason}}
         end
-    end, []).
+    end, Acc0).
 
 %% @equiv get_more(Cursor, ?DEFAULT_TIMEOUT)
 get_batch(Cursor) ->

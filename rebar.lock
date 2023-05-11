@@ -1,7 +1,7 @@
 {"1.2.0",
 [{<<"bson">>,
   {git,"https://github.com/bajankristof/bson.git",
-       {ref,"41677729b54a321e13d4474c75f4ea2d27b8dd18"}},
+       {ref,"851c1911eff1748204bfc701a3efa5b23b54420a"}},
   0},
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.2">>},0}]}.
 [

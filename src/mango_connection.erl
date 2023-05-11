@@ -10,8 +10,7 @@
     stop/1
 ]).
 -export([
-    database/1,
-    execute/2,
+    dispatch/2,
     await/1,
     await/2
 ]).
@@ -28,22 +27,15 @@
 -include("./_defaults.hrl").
 
 -record(state, {
+    opts,
     host,
     port,
-    database,
     socket,
     queue = #{},
-    buffer = <<>>,
-    next_length
+    buffer = <<>>
 }).
 
 -define(connect(Host, Port), gen_tcp:connect(Host, Port, [binary, {nodelay, true}])).
--define(state(Socket, Opts), #state{
-    host = maps:get(host, Opts, ?DEFAULT_HOST),
-    port = maps:get(port, Opts, ?DEFAULT_PORT),
-    database = maps:get(database, Opts),
-    socket = Socket
-}).
 
 %% === Gen Server Functions ===
 
@@ -63,17 +55,15 @@ stop(Connection) ->
 
 %% === Low-level Functions ===
 
--spec database(Connection :: mango:connection()) -> mango:database().
-database(Connection) ->
-    gen_server:call(Connection, database, ?DEFAULT_TIMEOUT).
-
--spec execute(
+-spec dispatch(
     Connection :: mango:connection(),
-    Command :: mango:command()
+    Command :: mango:command() | mango_message:t()
 ) -> gen_server:request_id().
-execute(Connection, Command) ->
+dispatch(Connection, #'mango.command'{} = Command) ->
     Message = mango_op_msg:encode(Command),
-    gen_server:send_request(Connection, {execute, Message}).
+    dispatch(Connection, Message);
+dispatch(Connection, Message) ->
+    gen_server:send_request(Connection, {dispatch, Message}).
 
 -spec await(
     Operation :: gen_server:request_id()
@@ -98,16 +88,15 @@ await(Operation, Timeout) ->
 
 %% === Gen Server Callbacks ===
 
-init(#{database := _} = Opts) ->
-    erlang:process_flag(trap_exit, true),
-    case connect(Opts) of
-        {ok, Socket} -> {ok, ?state(Socket, Opts)};
-        {error, Reason} -> {stop, Reason}
-    end.
+init(#{} = Opts0) ->
+    Opts = mango:start_opts(Opts0),
+    {ok, #state{
+        opts = Opts,
+        host = maps:get(host, Opts),
+        port = maps:get(port, Opts)
+    }, {continue, connect}}.
 
-handle_call(database, _, #state{database = Database} = State) ->
-    {reply, Database, State};
-handle_call({execute, Message}, From, #state{socket = Socket, queue = Queue} = State) ->
+handle_call({dispatch, Message}, From, #state{socket = Socket, queue = Queue} = State) ->
     Id = mango_message:request_id(Message),
     ok = gen_tcp:send(Socket, Message),
     {noreply, State#state{queue = Queue#{Id => From}}};
@@ -129,8 +118,16 @@ handle_info(_, State) ->
 handle_continue({message, Message}, #state{} = State) ->
     handle_message(Message, State);
 handle_continue(state_change, #state{} = State) ->
-    handle_state_change(State).
+    handle_state_change(State);
+handle_continue(connect, #state{opts = Opts} = State) ->
+    case connect(Opts) of
+        {ok, Socket} ->
+            {noreply, State#state{socket = Socket}};
+        {error, Reason} ->
+            {stop, Reason, State}
+    end.
 
+terminate(_, #state{socket = undefined}) -> ok;
 terminate(tcp_closed, _) -> ok;
 terminate(_, #state{socket = Socket}) ->
     gen_tcp:close(Socket).
@@ -140,10 +137,8 @@ terminate(_, #state{socket = Socket}) ->
 connect(Opts) ->
     connect(Opts, mango_backoff:from_start_opts(Opts)).
 
-connect(Opts, Backoff) ->
-    Host = maps:get(host, Opts, ?DEFAULT_HOST),
-    Port = maps:get(port, Opts, ?DEFAULT_PORT),
-    MaxAttempts = maps:get(max_attempts, Opts, ?DEFAULT_MAX_ATTEMPTS),
+connect(#{host := Host, port := Port} = Opts, Backoff) ->
+    MaxAttempts = maps:get(max_attempts, Opts),
     case {?connect(Host, Port), mango_backoff:n(Backoff, 1)} of
         {{ok, Socket}, _} ->
             {ok, [{sndbuf, Sndbuf}, {recbuf, Recbuf}, {buffer, Buffer}]} = inet:getopts(Socket, [sndbuf, recbuf, buffer]),

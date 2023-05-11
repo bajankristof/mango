@@ -40,6 +40,8 @@ init_per_group(mango_connection, Config) ->
     [{group, mango_connection} | Config];
 init_per_group(Group, Config) ->
     {ok, Connection} = mango:start_link(#{database => Group}),
+    %{ok, Connection} = mango:start_link(#{host => "primary.mongodb.service.consul", database => Group}),
+    %{ok, Connection} = mango:start_link(#{hosts => ["mongodb-0.node.consul", "mongodb-1.node.consul", "mongodb-2.node.consul"], database => Group}),
     true = erlang:unlink(Connection),
     [{group, Group}, {connection, Connection} | Config].
 

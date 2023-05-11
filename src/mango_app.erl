@@ -7,6 +7,9 @@
 
 start(_, _) ->
     ets:new(mango, [set, public, named_table, {write_concurrency, true}, {read_concurrency, true}]),
-    mango_sup:start_link().
+    ChildSpecs = lists:map(fun ({Id, Opts}) ->
+        mango:child_spec(Id, Opts)
+    end, application:get_env(mango, connections, [])),
+    mango_sup:start_link(ChildSpecs).
 
 stop(_) -> ok.

@@ -8,7 +8,8 @@
     child_spec/2,
     start_link/1,
     stop/1,
-    database/1,
+    select_server/2,
+    select_server/3,
     command/2,
     command/3
 ]).
@@ -39,11 +40,20 @@ start_link(Opts) ->
 stop(Connection) ->
     gen_server:stop(Connection).
 
--spec database(Connection :: mango:connection()) -> mango:database().
-database(Connection) ->
-    poolboy:transaction(Connection, fun (Worker) ->
-        mango_connection:database(Worker)
-    end).
+-spec select_server(
+    Connection :: mango:connection(),
+    Command :: mango:command()
+) -> {ok, mango:connection()} | {error, term()}.
+select_server(Connection, Command) ->
+    select_server(Connection, Command, ?DEFAULT_TIMEOUT).
+
+-spec select_server(
+    Connection :: mango:connection(),
+    Command :: mango:command(),
+    Timeout :: timeout()
+) -> {ok, mango:connection()} | {error, term()}.
+select_server(Connection, _, _) ->
+    {ok, Connection}.
 
 -spec command(
     Connection :: mango:connection(),
@@ -58,17 +68,19 @@ command(Connection, Command) ->
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
 command(Connection, Command, Timeout) ->
+    Message = mango_op_msg:encode(Command),
     Operation = poolboy:transaction(Connection, fun (Worker) ->
-        mango_connection:execute(Worker, Command)
+        mango_connection:dispatch(Worker, Message)
     end),
     mango_connection:await(Operation, Timeout).
 
 %% === Gen Server Callbacks ===
 
-init(#{} = Opts0) ->
+init(#{database := _} = Opts0) ->
+    Opts = mango:start_opts(Opts0),
     erlang:put('$mango_topology', ?MODULE),
-    Opts = maps:without([name], Opts0),
-    poolboy:init({pool_args(Opts), Opts}).
+    erlang:put('$mango_opts', Opts),
+    poolboy:init({pool_args(Opts), maps:without([name], Opts)}).
 
 handle_call(Request, From, State) ->
     poolboy:handle_call(Request, From, State).
@@ -87,9 +99,9 @@ terminate(Reason, State) ->
 
 %% === Internal Functions ===
 
-pool_args(#{} = Opts) ->
+pool_args(#{pool_size := Size} = Opts) ->
     [{worker_module, mango_connection},
-        {size, maps:get(pool_size, Opts, ?DEFAULT_POOL_SIZE)},
+        {size, Size},
         {max_overflow, 0},
         {strategy, fifo}
         | maps:to_list(maps:with([name], Opts))].
