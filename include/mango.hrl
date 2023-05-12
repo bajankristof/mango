@@ -1,2 +1,14 @@
--record('mango.command', {type = write, command, database = '$', opts = []}).
--record('mango.cursor', {id, connection, database, collection, first_batch, opts = []}).
+-record(command, {
+    type = write :: read | write,
+    command :: {binary(), term()},
+    database = '$' :: '$' | mango:database(),
+    opts = [] :: [{binary(), term()}]
+}).
+-record(cursor, {
+    id :: non_neg_integer(),
+    connection :: pid(),
+    database :: mango:database(),
+    collection :: mango:collection(),
+    first_batch :: [bson:document()],
+    opts = [] :: [{binary(), term()}]
+}).

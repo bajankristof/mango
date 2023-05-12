@@ -13,12 +13,7 @@
     take/1
 ]).
 
--type t() :: binary().
--type header() :: binary().
--type body() :: binary().
--export_type([t/0, header/0, body/0]).
-
--spec new(OpCode :: non_neg_integer(), Body :: binary()) -> t().
+-spec new(OpCode :: non_neg_integer(), Body :: binary()) -> binary().
 new(OpCode, Body) ->
     new(OpCode, mango_request_id:get(), Body).
 
@@ -26,7 +21,7 @@ new(OpCode, Body) ->
     OpCode :: non_neg_integer(),
     RequestId :: non_neg_integer(),
     Body :: binary()
-) -> t().
+) -> binary().
 new(OpCode, RequestId, Body) ->
     new(OpCode, RequestId, 0, Body).
 
@@ -35,32 +30,32 @@ new(OpCode, RequestId, Body) ->
     RequestId :: non_neg_integer(),
     ResponseTo :: non_neg_integer(),
     Body :: binary()
-) -> t().
+) -> binary().
 new(OpCode, RequestId, ResponseTo, Body) when erlang:is_binary(Body) ->
     Length = erlang:byte_size(Body) + 16,
     Header = bson:construct([{int32, Length}, {int32, RequestId}, {int32, ResponseTo}, {int32, OpCode}]),
     <<Header/binary, Body/binary>>.
 
--spec length(Message :: t()) -> integer().
+-spec length(Message :: binary()) -> integer().
 length(<<Chunk:4/binary, _/binary>>) ->
     {[Length], <<>>} = bson:destruct([int32], Chunk), Length.
 
--spec request_id(Message :: t()) -> integer().
+-spec request_id(Message :: binary()) -> integer().
 request_id(<<_:4/binary, Chunk:4/binary, _/binary>>) ->
     {[Id], <<>>} = bson:destruct([int32], Chunk), Id.
 
--spec response_to(Message :: t()) -> integer().
+-spec response_to(Message :: binary()) -> integer().
 response_to(<<_:8/binary, Chunk:4/binary, _/binary>>) ->
     {[Id], <<>>} = bson:destruct([int32], Chunk), Id.
 
--spec op_code(Message :: t()) -> integer().
+-spec op_code(Message :: binary()) -> integer().
 op_code(<<_:12/binary, Chunk:4/binary, _/binary>>) ->
     {[Code], <<>>} = bson:destruct([int32], Chunk), Code.
 
--spec body(Message :: t()) -> binary().
+-spec body(Message :: binary()) -> binary().
 body(<<_:16/binary, Body/binary>>) -> Body.
 
--spec take(Buffer :: binary()) -> {t(), binary()} | error.
+-spec take(Buffer :: binary()) -> {binary(), binary()} | error.
 take(Buffer) ->
     Length = length(Buffer),
     case Buffer of

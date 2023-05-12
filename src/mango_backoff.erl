@@ -2,7 +2,6 @@
 -module(mango_backoff).
 
 -export([
-    from_start_opts/1,
     new/2,
     time/1,
     sleep/1,
@@ -14,10 +13,6 @@
 -record(backoff, {n = 0, min, max}).
 
 -type t() :: #backoff{}.
-
--spec from_start_opts(Opts :: mango:start_opts()) -> t().
-from_start_opts(#{min_backoff := Min, max_backoff := Max}) ->
-    new(Min, Max).
 
 -spec new(Min :: pos_integer(), Max :: pos_integer()) -> t().
 new(Min, Max) ->

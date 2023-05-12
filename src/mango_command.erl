@@ -4,7 +4,7 @@
 -export([
     new/2,
     new/3,
-    patch/2,
+    new/4,
     opts/1
 ]).
 %% Aggregation Commands
@@ -54,14 +54,6 @@
 -include_lib("bson/include/bson.hrl").
 -include("mango.hrl").
 
--define(readPreference(Pref), {<<"$readPreference">>, #{<<"mode">> => case Pref of
-    primary -> <<"primary">>;
-    primary_preferred -> <<"primaryPreferred">>;
-    secondary -> <<"secondary">>;
-    secondary_preferred -> <<"secondaryPreferred">>;
-    nearest -> <<"nearest">>
-end}}).
-
 %% @equiv new(Command, Database, [])
 new(Command, Database) ->
     new(Command, Database, []).
@@ -81,16 +73,7 @@ new(Command, Database, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 new(Type, Command, Database, Opts) ->
-    #'mango.command'{type = Type, command = Command, database = Database, opts = opts(Opts)}.
-
--spec patch(Command :: mango:command(), Opts :: mango:start_opts()) -> mango:command().
-patch(#'mango.command'{type = write, database = '$'} = Command, #{database := Database}) ->
-    Command#'mango.command'{database = Database};
-patch(#'mango.command'{type = read, database = '$', opts = Opts} = Command, #{database := Database, read_preference := Pref}) ->
-    Command#'mango.command'{database = Database, opts = [?readPreference(Pref) | Opts]};
-patch(#'mango.command'{type = read, opts = Opts} = Command, #{read_preference := Pref}) ->
-    Command#'mango.command'{opts = [?readPreference(Pref) | Opts]};
-patch(Command, _) -> Command.
+    #command{type = Type, command = Command, database = Database, opts = opts(Opts)}.
 
 -spec opts(Opts :: list() | map()) -> list().
 opts(Opts) when erlang:is_map(Opts) ->
@@ -159,10 +142,10 @@ find_and_modify(Database, Collection, Opts) ->
     Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
 ) -> mango:command().
-get_more(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
+get_more(#cursor{id = Id, database = Database, collection = Collection}, Opts) ->
     get_more(Database, Collection, Id, Opts);
 get_more(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
-    [Database, Collection] = binary:split(Namespace, <<".">>),
+    [Database, Collection] = string:split(Namespace, <<".">>),
     get_more(Database, Collection, Id, Opts);
 get_more(#{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _} = Cursor}, Opts) ->
     get_more(Cursor, Opts).
@@ -256,7 +239,7 @@ drop_indexes(Database, Collection, Spec, Opts) ->
     Cursor :: mango:cursor() | bson:document(),
     Opts :: list() | map()
 ) -> mango:command().
-kill_cursor(#'mango.cursor'{id = Id, database = Database, collection = Collection}, Opts) ->
+kill_cursor(#cursor{id = Id, database = Database, collection = Collection}, Opts) ->
     kill_cursors(Database, Collection, [Id], Opts);
 kill_cursor(#{<<"id">> := Id, <<"ns">> := Namespace}, Opts) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
@@ -302,8 +285,8 @@ re_index(Database, Collection, Opts) ->
     new({<<"reIndex">>, Collection}, Database, Opts).
 
 -spec rename_collection(
-    Collection :: mango:namespace(),
-    To :: mango:namespace(),
+    Collection :: mango:collection(),
+    To :: mango:collection(),
     Opts :: list() | map()
 ) -> mango:command().
 rename_collection(Collection, To, Opts) ->

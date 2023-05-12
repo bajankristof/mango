@@ -13,12 +13,12 @@
 -include("defaults.hrl").
 
 -spec new(
-    Connection :: mango:connection(),
+    Connection :: gen_server:server_ref(),
     Source :: bson:document()
 ) -> mango:cursor().
 new(Connection, #{<<"id">> := Id, <<"ns">> := Namespace, <<"firstBatch">> := Batch}) ->
     [Database, Collection] = binary:split(Namespace, <<".">>),
-    #'mango.cursor'{id = Id, connection = Connection, database = Database, collection = Collection, first_batch = Batch};
+    #cursor{id = Id, connection = Connection, database = Database, collection = Collection, first_batch = Batch};
 new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _, <<"firstBatch">> := _} = Source}) ->
     new(Connection, Source).
 
@@ -26,18 +26,18 @@ new(Connection, #{<<"cursor">> := #{<<"id">> := _, <<"ns">> := _, <<"firstBatch"
     Cursor :: mango:cursor(),
     Opts :: list() | map()
 ) -> mango:cursor().
-set_opts(#'mango.cursor'{} = Cursor, Opts) ->
-    Cursor#'mango.cursor'{opts = opts(Opts)}.
+set_opts(#cursor{} = Cursor, Opts) ->
+    Cursor#cursor{opts = opts(Opts)}.
 
-%% @equiv exhaust(Cursor, ?DEFAULT_TIMEOUT)
+%% @equiv exhaust(Cursor, ?TIMEOUT)
 exhaust(Cursor) ->
-    exhaust(Cursor, ?DEFAULT_TIMEOUT).
+    exhaust(Cursor, ?TIMEOUT).
 
 -spec exhaust(
     Cursor :: mango:cursor(),
     Timeout :: timeout()
 ) -> {ok, [bson:document()]} | {error, term()}.
-exhaust(#'mango.cursor'{first_batch = Acc0} = Cursor, Timeout) ->
+exhaust(#cursor{first_batch = Acc0} = Cursor, Timeout) ->
     bson:loop(fun (Acc) ->
         case get_batch(Cursor, Timeout) of
             {nofin, Documents} ->
@@ -49,26 +49,26 @@ exhaust(#'mango.cursor'{first_batch = Acc0} = Cursor, Timeout) ->
         end
     end, Acc0).
 
-%% @equiv get_more(Cursor, ?DEFAULT_TIMEOUT)
+%% @equiv get_more(Cursor, ?TIMEOUT)
 get_batch(Cursor) ->
-    get_more(Cursor, ?DEFAULT_TIMEOUT).
+    get_more(Cursor, ?TIMEOUT).
 
 %% @equiv get_more(Cursor, Timeout)
 get_batch(Cursor, Timeout) ->
     get_more(Cursor, Timeout).
 
-%% @equiv get_more(Cursor, ?DEFAULT_TIMEOUT)
+%% @equiv get_more(Cursor, ?TIMEOUT)
 get_more(Cursor) ->
-    get_more(Cursor, ?DEFAULT_TIMEOUT).
+    get_more(Cursor, ?TIMEOUT).
 
 -spec get_more(
     Cursor :: mango:cursor(),
     Timeout :: timeout()
 ) -> {fin | nofin, [bson:document()]} | {error, term()}.
-get_more(#'mango.cursor'{id = 0}, _) -> {fin, []};
-get_more(#'mango.cursor'{} = Cursor, Timeout) ->
-    Command = mango_command:get_more(Cursor, Cursor#'mango.cursor'.opts),
-    case mango_topology:command(Cursor#'mango.cursor'.connection, Command, Timeout) of
+get_more(#cursor{id = 0}, _) -> {fin, []};
+get_more(#cursor{} = Cursor, Timeout) ->
+    Command = mango_command:get_more(Cursor, Cursor#cursor.opts),
+    case mango_topology:command(Cursor#cursor.connection, Command, Timeout) of
         {ok, #{<<"cursor">> := #{<<"id">> := 0, <<"nextBatch">> := Documents}}} ->
             {fin, Documents};
         {ok, #{<<"cursor">> := #{<<"nextBatch">> := Documents}}} ->
@@ -77,33 +77,33 @@ get_more(#'mango.cursor'{} = Cursor, Timeout) ->
             {error, Reason}
     end.
 
-%% @equiv get_one(Cursor, ?DEFAULT_TIMEOUT)
+%% @equiv get_one(Cursor, ?TIMEOUT)
 get_one(Cursor) ->
-    get_one(Cursor, ?DEFAULT_TIMEOUT).
+    get_one(Cursor, ?TIMEOUT).
 
 -spec get_one(
     Cursor :: mango:cursor(),
     Timeout :: timeout()
 ) -> {fin | nofin, undefined | bson:document()} | {error, term()}.
 get_one(Cursor, Timeout) ->
-    Opts = [{<<"batchSize">>, 1} | Cursor#'mango.cursor'.opts],
-    case get_more(Cursor#'mango.cursor'{opts = Opts}, Timeout) of
+    Opts = [{<<"batchSize">>, 1} | Cursor#cursor.opts],
+    case get_more(Cursor#cursor{opts = Opts}, Timeout) of
         {error, Reason} -> {error, Reason};
         {Statement, [Document]} -> {Statement, Document};
         {_, []} -> {fin, undefined}
     end.
 
-%% @equiv close(Cursor, ?DEFAULT_TIMEOUT)
+%% @equiv close(Cursor, ?TIMEOUT)
 close(Cursor) ->
-    close(Cursor, ?DEFAULT_TIMEOUT).
+    close(Cursor, ?TIMEOUT).
 
 -spec close(
     Cursor :: mango:cursor(),
     Timeout :: timeout()
 ) -> ok | {error, term()}.
-close(#'mango.cursor'{id = 0}, _) -> ok;
-close(#'mango.cursor'{connection = Connection} = Cursor, Timeout) ->
-    Command = mango_command:kill_cursor(Cursor, Cursor#'mango.cursor'.opts),
+close(#cursor{id = 0}, _) -> ok;
+close(#cursor{connection = Connection} = Cursor, Timeout) ->
+    Command = mango_command:kill_cursor(Cursor, Cursor#cursor.opts),
     case mango_topology:command(Connection, Command, Timeout) of
         {error, Reason} -> {error, Reason};
         {ok, _} -> ok
