@@ -7,8 +7,13 @@
     start_link/3,
     stop/1
 ]).
+-export([
+    run_command/2,
+    run_command/3
+]).
 
 -include("defaults.hrl").
+-include("mango.hrl").
 
 %% === Lifecycle Functions ===
 
@@ -45,3 +50,33 @@ start_link(Host, Port, Opts) ->
 -spec stop(Connection :: pid()) -> ok.
 stop(Connection) ->
     poolboy:stop(Connection).
+
+%% === API Functions ===
+
+%% @equiv run_command(Connection, Command, ?TIMEOUT)
+run_command(Connection, Command) ->
+    run_command(Connection, Command, ?TIMEOUT).
+
+-spec run_command(
+    Connection :: gen_server:server_ref(),
+    Command :: mango:command(),
+    Timeout :: timeout()
+) -> {ok, bson:document()} | {error, term()}.
+run_command(Connection, #command{} = Command, Timeout) ->
+    Request = mango_op_msg:encode(Command),
+    RequestId = poolboy:transaction(Connection, fun (Socket) ->
+        mango_socket:send(Socket, Request)
+    end),
+    case mango_socket:recv(RequestId, Timeout) of
+        {ok, Response} ->
+            case mango_op_msg:decode(Response) of
+                #{<<"ok">> := 1.0, <<"cursor">> := _} = Cursor ->
+                    {ok, mango_cursor:new(Connection, Cursor)};
+                #{<<"ok">> := 1.0} = Document ->
+                    {ok, Document};
+                #{<<"ok">> := 0.0} = Reason ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.

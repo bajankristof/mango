@@ -79,9 +79,9 @@ handle_continue(connect, #state{host = Host, port = Port, opts = Opts} = State) 
     {ok, Socket} = mango_socket:start_link(Host, Port, Opts),
     {noreply, State#state{socket = Socket}, {continue, heartbeat}};
 handle_continue(heartbeat, #state{topology = Topology, ref = Ref, host = Host, port = Port} = State) ->
-    {Rtt, Hello} = hello(State),
-    ServerInfo = mango_server_info:from_hello(Host, Port, Rtt, Hello),
-    Topology ! {update, Ref, ServerInfo},
+    {Latency, Hello} = hello(State),
+    ServerInfo = mango_server_info:from_hello(Host, Port, Latency, Hello),
+    Topology ! {hello, Ref, ServerInfo},
     erlang:send_after(?HEARTBEAT_INTERVAL, self(), {heartbeat, Ref}),
     {noreply, State}.
 
@@ -93,5 +93,5 @@ hello(#state{socket = Socket}) ->
     Start = erlang:system_time(millisecond),
     RequestId = mango_socket:send(Socket, Request),
     {ok, Response} = mango_socket:recv(RequestId, ?HEARTBEAT_INTERVAL),
-    Rtt = erlang:system_time(millisecond) - Start,
-    {Rtt, mango_op_msg:decode(Response)}.
+    Latency = erlang:system_time(millisecond) - Start,
+    {Latency, mango_op_msg:decode(Response)}.

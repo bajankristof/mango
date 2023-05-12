@@ -9,6 +9,6 @@
     connection :: pid(),
     database :: mango:database(),
     collection :: mango:collection(),
-    first_batch :: [bson:document()],
+    batch = [] :: [bson:document()],
     opts = [] :: [{binary(), term()}]
 }).

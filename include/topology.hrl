@@ -2,6 +2,8 @@
     type,
     database,
     read_preference,
+    read_from,
+    write_to,
     retry_reads = true,
     retry_writes = false,
     servers = []
@@ -12,5 +14,5 @@
     port,
     connection,
     last_write,
-    rtt
+    latency
 }).

@@ -42,5 +42,7 @@ max_staleness_seconds(#read_preference{max_staleness_seconds = MaxStalenessSecon
     MaxStalenessSeconds.
 
 -spec to_map(ReadPreference :: t()) -> map().
+to_map(#read_preference{mode = primary} = ReadPreference) ->
+    #{<<"mode">> => mode(ReadPreference, mongodb)};
 to_map(#read_preference{max_staleness_seconds = MaxStalenessSeconds} = ReadPreference) ->
     #{<<"mode">> => mode(ReadPreference, mongodb), <<"maxStalenessSeconds">> => MaxStalenessSeconds}.

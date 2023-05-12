@@ -34,9 +34,9 @@ groups() -> [
 
 init_per_suite(Config) ->
     application:ensure_all_started(mango),
-    {ok, Connection} = mango:start_link(#{database => benchmark}),
+    %{ok, Connection} = mango:start_link(#{database => benchmark}),
     %{ok, Connection} = mango:start_link(#{host => "primary.mongodb.service.consul", database => benchmark}),
-    %{ok, Connection} = mango:start_link(#{hosts => ["mongodb-0.node.consul", "mongodb-1.node.consul", "mongodb-2.node.consul"], database => benchmark}),
+    {ok, Connection} = mango:start_link(#{hosts => ["mongodb-0.node.consul", "mongodb-1.node.consul", "mongodb-2.node.consul"], database => benchmark}),
     true = erlang:unlink(Connection),
     [{connection, Connection} | Config].
 

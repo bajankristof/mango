@@ -2,7 +2,7 @@
 
 -import(mango_command, [opts/1]).
 
--export([child_spec/2, start_link/1, stop/1]).
+-export([child_spec/2, start_link/1, stop/1, info/1]).
 -export([aggregate/3, aggregate/4, aggregate/5]).
 -export([count/2, count/3, count/4, count/5]).
 -export([delete/3, delete/4, delete/5, delete/6]).
@@ -65,6 +65,10 @@ start_link(Opts) ->
 -spec stop(Topology :: gen_server:server_ref()) -> ok.
 stop(Topology) ->
     mango_topology:stop(Topology).
+
+-spec info(Topology :: gen_server:server_ref()) -> tuple().
+info(Topology) ->
+    mango_topology:info(Topology).
 
 %% === Aggregation Functions ===
 
@@ -268,8 +272,8 @@ find_one(Topology, Collection, Selector, Opts0, Timeout) ->
     Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 1}, {<<"singleBatch">>, true} | opts(Opts0)],
     Command = mango_command:find('$', Collection, Opts),
     case run_command(Topology, Command, Timeout) of
-        {ok, #cursor{first_batch = [Document]}} -> Document;
-        {ok, #cursor{first_batch = []}} -> undefined;
+        {ok, #cursor{batch = [Document]}} -> Document;
+        {ok, #cursor{batch = []}} -> undefined;
         {error, Reason} -> {error, Reason}
     end.
 
@@ -337,5 +341,5 @@ run_command(Topology, Command) ->
     Command :: command(),
     Timeout :: timeout()
 ) -> {ok, bson:document()} | {error, term()}.
-run_command(_Topology, #command{} = _Command, _Timeout) ->
-    {error, nocode}.
+run_command(Topology, #command{} = Command, Timeout) ->
+    mango_topology:run_command(Topology, Command, Timeout).
