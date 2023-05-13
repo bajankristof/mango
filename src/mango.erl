@@ -19,8 +19,8 @@
 -export_type([database/0, read_preference/0, read_preference_mode/0]).
 -export_type([collection/0, command/0, cursor/0]).
 
--include("mango.hrl").
 -include("defaults.hrl").
+-include("mango.hrl").
 
 -type start_opts() :: #{
     name := gen_server:server_name(),

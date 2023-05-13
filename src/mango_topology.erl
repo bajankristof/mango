@@ -120,7 +120,7 @@ handle_cast(_, State) ->
     {noreply, State}.
 
 handle_info({hello, Ref, ServerInfo}, #state{ref = Ref} = State0) ->
-    State = accept_server(State0, ServerInfo),
+    State = update_server(State0, ServerInfo),
     #state{topology_info = TopologyInfo, read_queue = RQueue0, write_queue = WQueue0} = State,
     RQueue = consume_queue(RQueue0, mango_topology_info:select_server(TopologyInfo, read)),
     WQueue = consume_queue(WQueue0, mango_topology_info:select_server(TopologyInfo, write)),
@@ -135,7 +135,7 @@ handle_continue(connect, #state{opts = Opts} = State) ->
     Port = maps:get(port, Opts, ?PORT),
     {noreply, State, {continue, {connect, [{Host, Port}]}}};
 handle_continue({connect, [{Host, Port} | Hosts]}, State) ->
-    {noreply, connect_server(State, Host, Port), {continue, {connect, Hosts}}};
+    {noreply, add_server(State, Host, Port), {continue, {connect, Hosts}}};
 handle_continue({connect, [Host | Hosts]}, State) ->
     handle_continue({connect, [{Host, ?PORT} | Hosts]}, State);
 handle_continue({connect, []}, State) ->
@@ -143,7 +143,12 @@ handle_continue({connect, []}, State) ->
 
 %% === Internal Functions ===
 
-connect_server(#state{
+-spec add_server(
+    State :: #state{},
+    Host :: inet:hostname(),
+    Port :: inet:port_number()
+) -> #state{}.
+add_server(#state{
     ref = Ref,
     opts = Opts,
     topology_info = TopologyInfo,
@@ -154,25 +159,46 @@ connect_server(#state{
     ServerInfo = mango_server_info:new(Host, Port, Connection),
     State#state{topology_info = mango_topology_info:add_server(TopologyInfo, ServerInfo)}.
 
-accept_server(#state{topology_info = TopologyInfo} = State, ServerInfo) ->
-    State#state{topology_info = mango_topology_info:update_server(TopologyInfo, ServerInfo)}.
+-spec update_server(
+    State :: #state{},
+    ServerInfo :: tuple()
+) -> #state{}.
+update_server(#state{topology_info = TopologyInfo0} = State, ServerInfo) ->
+    TopologyInfo = mango_topology_info:update_server(TopologyInfo0, ServerInfo),
+    State#state{topology_info = TopologyInfo}.
 
-select_server(Topology, TopologyInfo, #command{type = Operation}, Timeout) ->
-    select_server(Topology, TopologyInfo, Operation, Timeout);
+-spec select_server(
+    Topology :: gen_server:server_ref(),
+    TopologyInfo :: tuple(),
+    Operation :: read | write,
+    Timeout :: timeout()
+) -> {ok, pid()} | {error, term()}.
 select_server(Topology, TopologyInfo, Operation, Timeout) ->
     case mango_topology_info:select_server(TopologyInfo, Operation) of
         {value, ServerInfo} -> {ok, mango_server_info:connection(ServerInfo)};
         false -> gen_server:call(Topology, {select_server, Operation}, Timeout)
     end.
 
-run_command(Topology, TopologyInfo, Command, Timeout) ->
-    case select_server(Topology, TopologyInfo, Command, Timeout) of
-        {ok, Connection} -> mango_connection:run_command(Connection, Command, Timeout);
-        {error, Reason} -> {error, Reason}
-    end.
-
+-spec consume_queue(
+    Queue :: [gen_server:from()],
+    {value, ServerInfo :: tuple()} | false
+) -> [gen_server:from()].
 consume_queue(Queue, false) -> Queue;
 consume_queue(Queue, {value, ServerInfo}) ->
     Connection = mango_server_info:connection(ServerInfo),
-    lists:foreach(fun (From) -> gen_server:reply(From, {ok, Connection}) end, Queue),
+    Callback = fun (From) -> gen_server:reply(From, {ok, Connection}) end,
+    lists:foreach(Callback, Queue),
     [].
+
+-spec run_command(
+    Topology :: gen_server:server_ref(),
+    TopologyInfo :: tuple(),
+    Command :: mango:command(),
+    Timeout :: timeout()
+) -> {ok, bson:document() | mango:cursor()} | {error, term()}.
+run_command(Topology, TopologyInfo, Command, Timeout) ->
+    #command{type = Operation} = Command,
+    case select_server(Topology, TopologyInfo, Operation, Timeout) of
+        {ok, Connection} -> mango_connection:run_command(Connection, Command, Timeout);
+        {error, Reason} -> {error, Reason}
+    end.

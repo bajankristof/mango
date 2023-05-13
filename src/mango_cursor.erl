@@ -9,8 +9,8 @@
 -export([get_one/1, get_one/2]).
 -export([close/1, close/2]).
 
--include("mango.hrl").
 -include("defaults.hrl").
+-include("mango.hrl").
 
 -spec new(
     Connection :: gen_server:server_ref(),

@@ -26,8 +26,8 @@
     terminate/2
 ]).
 
--include("mango.hrl").
 -include("defaults.hrl").
+-include("mango.hrl").
 
 -record(state, {
     host,
