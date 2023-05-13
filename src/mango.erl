@@ -87,8 +87,7 @@ aggregate(Topology, Collection, Pipeline, Opts) ->
     Opts :: list() | map(),
     Timeout :: timeout()
 ) -> {ok, cursor()} | {error, term()}.
-aggregate(Topology, Collection, Pipeline, Opts0, Timeout) ->
-    Opts = [{<<"cursor">>, #{<<"batchSize">> => 0}} | opts(Opts0)],
+aggregate(Topology, Collection, Pipeline, Opts, Timeout) ->
     Command = mango_command:aggregate('$', Collection, Pipeline, Opts),
     run_command(Topology, Command, Timeout).
 
@@ -194,7 +193,7 @@ find(Topology, Collection, Selector, Opts) ->
     Timeout :: timeout()
 ) -> {ok, cursor()} | {error, term()}.
 find(Topology, Collection, Selector, Opts0, Timeout) ->
-    Opts = [{<<"filter">>, Selector}, {<<"batchSize">>, 0}, {<<"singleBatch">>, false} | opts(Opts0)],
+    Opts = [{<<"filter">>, Selector} | opts(Opts0)],
     Command = mango_command:find('$', Collection, Opts),
     Topology, run_command(Topology, Command, Timeout).
 
