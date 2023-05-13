@@ -87,9 +87,16 @@ aggregate(Topology, Collection, Pipeline, Opts) ->
     Opts :: list() | map(),
     Timeout :: timeout()
 ) -> {ok, cursor()} | {error, term()}.
-aggregate(Topology, Collection, Pipeline, Opts, Timeout) ->
-    Command = mango_command:aggregate('$', Collection, Pipeline, Opts),
-    run_command(Topology, Command, Timeout).
+aggregate(Topology, Collection, Pipeline, Opts0, Timeout) when erlang:is_list(Opts0) ->
+    {Cursor, Opts} = case lists:keytake(<<"batchSize">>, 1, Opts0) of
+        {value, {_, Size}, Rest} -> {#{<<"batchSize">> => Size}, Rest};
+        false -> {#{}, Opts0}
+    end,
+    Command = mango_command:aggregate('$', Collection, Pipeline, [{<<"cursor">>, Cursor} | Opts]),
+    run_command(Topology, Command, Timeout);
+aggregate(Topology, Collection, Pipeline, Opts0, Timeout) ->
+    Opts = opts(Opts0),
+    aggregate(Topology, Collection, Pipeline, Opts, Timeout).
 
 %% @equiv count(Topology, Collection, #{})
 count(Topology, Collection) ->
