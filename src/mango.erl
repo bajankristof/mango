@@ -16,7 +16,7 @@
 -export([run_command/2, run_command/3]).
 
 -export_type([start_opts/0]).
--export_type([database/0, read_preference/0, read_preference_mode/0]).
+-export_type([hostent/0, database/0, read_preference/0, read_preference_mode/0]).
 -export_type([collection/0, command/0, cursor/0]).
 
 -include("defaults.hrl").
@@ -24,9 +24,10 @@
 
 -type start_opts() :: #{
     name := gen_server:server_name(),
+    url := iolist(),
     host := inet:hostname(),
     port := inet:port_number(),
-    hosts := [inet:hostname() | {inet:hostname(), inet:port_number()}],
+    hosts := [hostent()],
     database := database(),
     max_attempts := infinity | pos_integer(),
     max_backoff := pos_integer(),
@@ -37,6 +38,7 @@
     retry_writes := boolean()
 }.
 
+-type hostent() :: inet:hostname() | {inet:hostname(), inet:port_number()}.
 -type database() :: atom() | binary().
 -type read_preference() ::
     read_preference_mode() |

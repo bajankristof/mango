@@ -97,6 +97,9 @@ run_command(Topology, #command{} = Command0, Timeout) ->
 
 %% === Gen Server Callbacks ===
 
+init(#{url := URL} = Opts0) ->
+    Opts = mango_url:parse(URL),
+    init(maps:merge(maps:remove(url, Opts0), Opts));
 init(#{database := _} = Opts) ->
     TopologyInfo = mango_topology_info:new(Opts),
     {ok, Supervisor} = mango_sup:start_link(simple_one_for_one, [mango_server_monitor:child_spec()]),
