@@ -7,7 +7,7 @@
 
 -define(OP_CODE, 2013).
 
--spec encode(Command :: map() | list()) -> binary().
+-spec encode(Command :: mango:command() | map() | list()) -> binary().
 encode(#command{command = Command, database = Database, opts = Opts}) ->
     encode([Command, {"$db", Database} | Opts]);
 encode(Command) when erlang:is_map(Command) orelse erlang:is_list(Command) ->

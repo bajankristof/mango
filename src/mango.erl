@@ -37,7 +37,7 @@
     retry_writes := boolean()
 }.
 
--type database() :: atom() | iolist().
+-type database() :: atom() | binary().
 -type read_preference() ::
     read_preference_mode() |
     #{mode := read_preference_mode(), max_staleness_seconds := pos_integer()}.
@@ -48,7 +48,7 @@
     | secondary_preferred
     | nearest.
 
--type collection() :: atom() | iolist().
+-type collection() :: atom() | binary().
 -type command() :: #command{}.
 -type cursor() :: #cursor{}.
 
@@ -346,6 +346,6 @@ run_command(Topology, Command) ->
     Topology :: gen_server:server_ref(),
     Command :: command(),
     Timeout :: timeout()
-) -> {ok, bson:document()} | {error, term()}.
+) -> {ok, bson:document()} | {ok, cursor()} | {error, term()}.
 run_command(Topology, #command{} = Command, Timeout) ->
     mango_topology:run_command(Topology, Command, Timeout).

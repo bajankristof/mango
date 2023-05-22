@@ -53,7 +53,7 @@ stop(Topology) ->
 
 %% === API Functions ===
 
--spec info(Topology :: gen_server:server_ref()) -> {ok, tuple()} | {error, term()}.
+-spec info(Topology :: gen_server:server_ref()) -> tuple().
 info(Topology) ->
     gen_server:call(Topology, info).
 
@@ -78,7 +78,7 @@ run_command(Topology, Command) ->
     Topology :: gen_server:server_ref(),
     Command :: mango:command(),
     Timeout :: timeout()
-) -> {ok, mango:cursor() | bson:document()} | {error, term()}.
+) -> {ok, bson:document()} | {ok, mango:cursor()} | {error, term()}.
 run_command(Topology, #command{} = Command0, Timeout) ->
     TopologyInfo = info(Topology),
     Command = mango_topology_info:prepare(TopologyInfo, Command0),

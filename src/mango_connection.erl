@@ -25,7 +25,7 @@ child_spec(Id, Host, Port) ->
     Id :: supervisor:child_id(),
     Host :: inet:hostname(),
     Port :: inet:port_number(),
-    Opts :: mango:start_opts()
+    Opts :: mango:start_opts() | map()
 ) -> supervisor:child_spec().
 child_spec(Id, Host, Port, Opts) ->
     #{id => Id, start => {?MODULE, start_link, [Host, Port, Opts]}, restart => transient}.
@@ -37,7 +37,7 @@ start_link(Host, Port) ->
 -spec start_link(
     Host :: inet:hostname(),
     Port :: inet:port_number(),
-    Opts :: mango:start_opts()
+    Opts :: mango:start_opts() | map()
 ) -> gen_server:start_ret().
 start_link(Host, Port, Opts) ->
     poolboy:start_link([
@@ -45,7 +45,7 @@ start_link(Host, Port, Opts) ->
         {size, maps:get(pool_size, Opts, ?POOL_SIZE)},
         {max_overflow, 0},
         {strategy, fifo}
-    ], {Host, Port, Opts}).
+    ], [{host, Host}, {port, Port}, {opts, Opts}]).
 
 -spec stop(Connection :: pid()) -> ok.
 stop(Connection) ->
@@ -61,7 +61,7 @@ run_command(Connection, Command) ->
     Connection :: gen_server:server_ref(),
     Command :: mango:command(),
     Timeout :: timeout()
-) -> {ok, bson:document()} | {error, term()}.
+) -> {ok, bson:document()} | {ok, mango:cursor()} | {error, term()}.
 run_command(Connection, #command{} = Command, Timeout) ->
     Request = mango_op_msg:encode(Command),
     RequestId = poolboy:transaction(Connection, fun (Socket) ->

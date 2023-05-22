@@ -52,17 +52,16 @@ child_spec(Id, Host, Port) ->
     Id :: supervisor:child_id(),
     Host :: inet:hostname(),
     Port :: inet:port_number(),
-    Opts :: mango:start_opts()
+    Opts :: mango:start_opts() | map()
 ) -> supervisor:child_spec().
 child_spec(Id, Host, Port, Opts) ->
     #{id => Id, start => {?MODULE, start_link, [Host, Port, Opts]}, restart => transient}.
 
--spec start_link({
-    Host :: inet:hostname(),
-    Port :: inet:port_number(),
-    Opts :: mango:start_opts()
-}) -> gen_server:start_ret().
-start_link({Host, Port, Opts}) ->
+-spec start_link(Args :: proplists:proplist()) -> {error, term()} | {ok, pid()}.
+start_link(Args) ->
+    Host = proplists:get_value(host, Args),
+    Port = proplists:get_value(port, Args),
+    Opts = proplists:get_value(opts, Args, #{}),
     start_link(Host, Port, Opts).
 
 %% @equiv start_link(Host, Port, #{})
@@ -72,7 +71,7 @@ start_link(Host, Port) ->
 -spec start_link(
     Host :: inet:hostname(),
     Port :: inet:port_number(),
-    Opts :: mango:start_opts()
+    Opts :: mango:start_opts() | map()
 ) -> gen_server:start_ret().
 start_link(Host, Port, Opts) ->
     gen_server:start_link(?MODULE, {Host, Port, Opts}, []).
@@ -97,7 +96,7 @@ recv(RequestId) ->
 -spec recv(
     RequestId :: gen_server:request_id(),
     Timeout :: timeout()
-) -> {ok, bson:document()} | {error, term()}.
+) -> {ok, binary()} | {error, term()}.
 recv(RequestId, Timeout) ->
     case gen_server:receive_response(RequestId, Timeout) of
         {reply, Response} -> {ok, Response};

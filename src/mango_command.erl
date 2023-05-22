@@ -58,17 +58,13 @@
 new(Command, Database) ->
     new(Command, Database, []).
 
--spec new(
-    Command :: tuple(),
-    Database :: mango:database(),
-    Opts :: list() | map()
-) -> mango:command().
+%% @equiv new(write, Command, Database, Opts)
 new(Command, Database, Opts) ->
     new(write, Command, Database, Opts).
 
 -spec new(
     Type :: read | write,
-    Command :: mango:command(),
+    Command :: {binary(), term()},
     Database :: mango:database(),
     Opts :: list() | map()
 ) -> mango:command().
@@ -207,9 +203,9 @@ create_indexes(Database, Collection, Specs, Opts) ->
 
 -spec current_op(All :: boolean()) -> mango:command().
 current_op(true) ->
-    new(read, {<<"currentOp">>, 1}, <<"admin">>, [{<<"$all">>, true}]);
+    new(read, {<<"currentOp">>, 1}, admin, [{<<"$all">>, true}]);
 current_op(false) ->
-    new(read, {<<"currentOp">>, 1}, <<"admin">>, [{<<"$ownOps">>, true}]).
+    new(read, {<<"currentOp">>, 1}, admin, [{<<"$ownOps">>, true}]).
 
 -spec drop_collection(
     Database :: mango:database(),
@@ -290,22 +286,22 @@ re_index(Database, Collection, Opts) ->
     Opts :: list() | map()
 ) -> mango:command().
 rename_collection(Collection, To, Opts) ->
-    new({<<"renameCollection">>, Collection}, <<"admin">>, [{<<"to">>, To} | opts(Opts)]).
+    new({<<"renameCollection">>, Collection}, admin, [{<<"to">>, To} | opts(Opts)]).
 
 %% === Diagnostic Commands ===
 %% https://docs.mongodb.com/manual/reference/command/#diagnostic-commands
 
 -spec hello() -> mango:command().
 hello() ->
-    new(read, {<<"hello">>, 1}, <<"admin">>, []).
+    new(read, {<<"hello">>, 1}, admin, []).
 
 -spec ping() -> mango:command().
 ping() ->
-    new(read, {<<"ping">>, 1}, <<"admin">>, []).
+    new(read, {<<"ping">>, 1}, admin, []).
 
 -spec top() -> mango:command().
 top() ->
-    new(read, {<<"top">>, 1}, <<"admin">>, []).
+    new(read, {<<"top">>, 1}, admin, []).
 
 -spec explain(
     Database :: mango:database(),
