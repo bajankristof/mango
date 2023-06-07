@@ -71,15 +71,21 @@ handle_cast(_, State) ->
     {noreply, State}.
 
 handle_info({heartbeat, Ref}, #state{ref = Ref} = State) ->
-    {noreply, State, {continue, heartbeat}};
+    {hello, Latency, Hello} = hello(State),
+    {noreply, State, {continue, {hello, Latency, Hello}}};
 handle_info(_, State) ->
     {noreply, State}.
 
-handle_continue(connect, #state{host = Host, port = Port, opts = Opts} = State) ->
+handle_continue(connect, #state{ref = Ref, host = Host, port = Port, opts = Opts} = State) ->
     {ok, Socket} = mango_socket:start_link(Host, Port, Opts),
-    {noreply, State#state{socket = Socket}, {continue, heartbeat}};
-handle_continue(heartbeat, #state{topology = Topology, ref = Ref, host = Host, port = Port} = State) ->
-    {Latency, Hello} = hello(State),
+    self() ! {heartbeat, Ref},
+    {noreply, State#state{socket = Socket}};
+handle_continue({hello, _, #{<<"ok">> := 0.0}}, #state{topology = Topology, ref = Ref, host = Host, port = Port} = State) ->
+    ServerInfo = mango_server_info:new(Host, Port, undefined),
+    Topology ! {hello, Ref, ServerInfo},
+    erlang:send_after(?HEARTBEAT_INTERVAL, self(), {heartbeat, Ref}),
+    {noreply, State};
+handle_continue({hello, Latency, Hello}, #state{topology = Topology, ref = Ref, host = Host, port = Port} = State) ->
     ServerInfo = mango_server_info:from_hello(Host, Port, Latency, Hello),
     Topology ! {hello, Ref, ServerInfo},
     erlang:send_after(?HEARTBEAT_INTERVAL, self(), {heartbeat, Ref}),
@@ -94,4 +100,4 @@ hello(#state{socket = Socket}) ->
     RequestId = mango_socket:send(Socket, Request),
     {ok, Response} = mango_socket:recv(RequestId, ?HEARTBEAT_INTERVAL),
     Latency = erlang:system_time(millisecond) - Start,
-    {Latency, mango_op_msg:decode(Response)}.
+    {hello, Latency, mango_op_msg:decode(Response)}.

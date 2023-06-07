@@ -153,12 +153,13 @@ terminate(_, #state{socket = Socket}) ->
 %% === Internal Functions ===
 
 connect(#state{max_backoff = MaxBackoff, min_backoff = MinBackoff} = State) ->
-    Backoff = mango_backoff:new(MaxBackoff, MinBackoff),
+    Backoff = mango_backoff:new(MinBackoff, MaxBackoff),
     connect(State, Backoff).
 
 connect(#state{host = Host, port = Port, max_attempts = MaxAttempts} = State, Backoff) ->
     case {?connect(Host, Port), mango_backoff:n(Backoff, 1)} of
         {{ok, Socket}, _} ->
+            logger:info("mango: Established connection to ~ts:~p", [Host, Port]),
             {ok, [{sndbuf, Sndbuf}, {recbuf, Recbuf}, {buffer, Buffer}]} = inet:getopts(Socket, [sndbuf, recbuf, buffer]),
             ok = inet:setopts(Socket, [{buffer, lists:foldl(fun erlang:max/2, 16, [Sndbuf, Recbuf, Buffer])}]),
             {ok, Socket};
